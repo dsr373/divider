@@ -2,7 +2,7 @@ use std::fmt;
 
 #[derive(Eq, PartialEq, Hash)]
 pub struct User {
-    name: String,
+    pub name: String,
 }
 
 impl User {
