@@ -1,13 +1,13 @@
 use std::fmt;
 
+#[derive(Eq, PartialEq, Hash)]
 pub struct User {
     name: String,
-    balance: f32
 }
 
 impl User {
     pub fn new(name_: String) -> User {
-        User { name: name_, balance: 0.0 }
+        User { name: name_ }
     }
 }
 
@@ -19,6 +19,6 @@ impl fmt::Display for User {
 
 impl fmt::Debug for User {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "User {}: {}", self.name, self.balance)
+        write!(f, "User {}", self.name)
     }
 }
