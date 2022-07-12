@@ -1,13 +1,39 @@
 use std::fmt;
+// use std::collections::HashSet;
+// use std::sync::RwLock;
 
-#[derive(Eq, PartialEq, Hash)]
+// use rand::Rng;
+// use rand::prelude::ThreadRng;
+
+#[derive(Eq, PartialEq, Clone, Hash)]
 pub struct User {
-    pub name: String,
+    // pub id: usize,
+    pub name: String
 }
 
+// static mut allUserIds: RwLock<HashSet<usize>> = RwLock::new(HashSet::new());
+
 impl User {
-    pub fn new(name_: String) -> User {
-        User { name: name_ }
+
+    // fn new_id() -> usize {
+    //     let mut rng = rand::thread_rng();
+    //     let mut id: usize = rng.gen::<usize>();
+    //     while {
+    //         let all_ids = allUserIds.read().unwrap();
+    //         all_ids.contains(&id)
+    //     } {
+    //         id = rng.gen::<usize>();
+    //     }
+    //     allUserIds.write().unwrap().insert(id);
+    //     return id;
+    // }
+
+    pub fn new(name: String) -> User {
+        User { name }
+    }
+
+    pub fn from(name: String) -> User {
+        User { name }
     }
 }
 
@@ -21,4 +47,23 @@ impl fmt::Debug for User {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "User {}", self.name)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::core::user::User;
+
+    #[test]
+    fn can_print() {
+        let user = User::new("Pinocchio".to_string());
+        print!("{}", user);
+    }
+
+    #[test]
+    fn can_debug() {
+        let user = User::new("Pinocchio".to_string());
+        print!("{:?}", user);
+    }
+
+
 }
