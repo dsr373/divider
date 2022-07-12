@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::core::user::User;
-use crate::core::transaction::{Transaction, Amount, TransactionResult, TransactionError, AmountPerUser, BenefitsMap};
+use crate::core::transaction::{Transaction, Amount, TransactionResult, TransactionError, AmountPerUser, BenefitPerUser};
 
 pub struct Ledger {
     balances: HashMap<User, Amount>,
@@ -14,7 +14,7 @@ impl Ledger {
         let mut balances = HashMap::new();
 
         for name in user_names {
-            balances.insert(User::new(name), 0f32 as Amount);
+            balances.insert(User::new(&name), 0f32 as Amount);
         }
 
         return Ledger { balances, transactions: Vec::new(), total_spend: 0f32 as Amount };
@@ -30,7 +30,7 @@ impl Ledger {
             .find_map(|user| if user.name == name { Some(user) } else {None})
     }
 
-    fn update_balances(&mut self, changes: AmountPerUser) -> TransactionResult<()> {
+    fn update_balances(&mut self, changes: HashMap<User, Amount>) -> TransactionResult<()> {
         for (user, delta) in &changes {
             match self.balances.get_mut(user) {
                 Some(val) => *val += delta,
@@ -48,7 +48,7 @@ impl Ledger {
     }
 
     // TODO: add transactions
-    pub fn add_transaction(&mut self, contributions: AmountPerUser, benefits: BenefitsMap) -> TransactionResult<()> {
+    pub fn add_transaction(&mut self, contributions: AmountPerUser, benefits: BenefitPerUser) -> TransactionResult<()> {
         let transaction = Transaction::new(contributions, benefits);
         self.apply_transaction(&transaction)?;
         self.transactions.push(transaction);

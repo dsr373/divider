@@ -20,12 +20,12 @@ impl std::fmt::Display for Benefit {
     }
 }
 
-pub type AmountPerUser = HashMap<User, Amount>;
-pub type BenefitsMap = HashMap<User, Benefit>;
+pub type AmountPerUser = Vec<(User, Amount)>;
+pub type BenefitPerUser = Vec<(User, Benefit)>;
 
 pub struct Transaction {
     contributions: AmountPerUser,
-    benefits: BenefitsMap
+    benefits: BenefitPerUser
 }
 
 impl std::fmt::Display for Transaction {
@@ -43,7 +43,7 @@ impl std::fmt::Display for Transaction {
     }
 }
 
-
+#[derive(Debug)]
 pub enum TransactionError {
     InsufficientBenefits{specified: Amount, spent: Amount},
     ExcessBenefits{specified: Amount, spent: Amount},
@@ -53,32 +53,33 @@ pub enum TransactionError {
 pub type TransactionResult<T> = Result<T, TransactionError>;
 
 impl Transaction {
-    pub fn new(contributions: AmountPerUser, benefits: BenefitsMap) -> Transaction {
+    pub fn new(contributions: AmountPerUser, benefits: BenefitPerUser) -> Transaction {
         Transaction { contributions, benefits }
     }
 
     pub fn total_spending(&self) -> Amount {
-        return self.contributions.values().sum();
+        return self.contributions.iter()
+            .map(|contrib| contrib.1).sum();
     }
 
-    pub fn specified_benefits(&self) -> Amount {
-        return self.benefits.values()
-            .map(|benefit| match *benefit {
+    fn specified_benefits(&self) -> Amount {
+        return self.benefits.iter()
+            .map(|user_benefit| match user_benefit.1 {
                 Benefit::Sum(val) => val,
                 _ => 0.0
             }).sum();
     }
 
-    pub fn num_even_benefits(&self) -> usize {
-        return self.benefits.values()
-            .map(|benefit| match benefit {
-                Benefit::Even => true,
-                _ => false
-            }).count();
+    fn num_even_benefits(&self) -> usize {
+        return self.benefits.iter()
+            .fold(0,|count, user_benefit| match user_benefit.1 {
+                Benefit::Even => count + 1,
+                _ => count
+            });
     }
 
-    pub fn balance_updates(&self) -> TransactionResult<AmountPerUser> {
-        let mut balance_delta: AmountPerUser = HashMap::new();
+    pub fn balance_updates(&self) -> TransactionResult<HashMap<User, Amount>> {
+        let mut balance_delta: HashMap<User, Amount> = HashMap::new();
 
         let spending = self.total_spending();
         let specified_benefits = self.specified_benefits();
@@ -106,5 +107,87 @@ impl Transaction {
         }
 
         return Ok(balance_delta);
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{HashSet, HashMap};
+    use crate::core::User;
+    use crate::core::Transaction;
+    use crate::core::transaction::{AmountPerUser, Benefit, BenefitPerUser};
+
+    #[test]
+    fn can_print() {
+        let bilbo = User::new("Bilbo");
+        let legolas = User::new("Legolas");
+        let gimli = User::new("Gimli");
+
+        let contrib: AmountPerUser = vec![(bilbo, 32.0)];
+
+        let benefit: BenefitPerUser = vec![
+            (legolas, Benefit::Even),
+            (gimli, Benefit::Sum(10.0))
+        ];
+
+        let transaction = Transaction::new(contrib, benefit);
+        let repr = transaction.to_string();
+
+        assert_eq!(repr, "Contributions: Bilbo: 32; Beneficiaries: Legolas: Even; Gimli: 10; ");
+    }
+
+    #[test]
+    fn total_spent() {
+        let bilbo = User::new("Bilbo");
+        let frodo = User::new("Frodo");
+        let legolas = User::new("Legolas");
+        let gimli = User::new("Gimli");
+
+        let contrib: AmountPerUser = vec![
+            (bilbo, 32.0),
+            (frodo, 12.0)
+        ];
+
+        let benefit: BenefitPerUser = vec![
+            (legolas, Benefit::Even),
+            (gimli, Benefit::Sum(10.0))
+        ];
+
+        let transaction = Transaction::new(contrib, benefit);
+        assert_eq!(transaction.total_spending(), 44.0);
+    }
+
+    #[test]
+    fn balance_distribution() {
+        let bilbo = User::new("Bilbo");
+        let frodo = User::new("Frodo");
+        let legolas = User::new("Legolas");
+        let gimli = User::new("Gimli");
+
+        let contrib: AmountPerUser = vec![
+            (bilbo.clone(), 32.0),
+            (frodo.clone(), 12.0)
+        ];
+
+        let benefit: BenefitPerUser = vec![
+            (legolas.clone(), Benefit::Even),
+            (frodo.clone(), Benefit::Even),
+            (gimli.clone(), Benefit::Sum(10.0))
+        ];
+
+        let transaction = Transaction::new(contrib, benefit);
+        let balance_delta = transaction.balance_updates().unwrap();
+
+        assert_eq!(balance_delta.keys().len(), 4);
+
+        assert_eq!(transaction.num_even_benefits(), 2);
+        assert_eq!(transaction.total_spending(), 44.0);
+        assert_eq!(transaction.specified_benefits(), 10.0);
+
+        assert_eq!(*balance_delta.get(&bilbo).unwrap(), 32.0);
+        assert_eq!(*balance_delta.get(&legolas).unwrap(), -17.0);
+        assert_eq!(*balance_delta.get(&frodo).unwrap(), -5.0);
+        assert_eq!(*balance_delta.get(&gimli).unwrap(), -10.0);
     }
 }

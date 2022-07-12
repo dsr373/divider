@@ -1,7 +1,7 @@
 mod core;
-use crate::core::user::{self, User};
+use crate::core::User;
 
 fn main() {
-    let user = User::new("John Doe".to_string());
+    let user = User::new("John Doe");
     println!("Hello, {}!", user);
 }

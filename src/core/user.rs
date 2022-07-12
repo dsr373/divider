@@ -28,12 +28,8 @@ impl User {
     //     return id;
     // }
 
-    pub fn new(name: String) -> User {
-        User { name }
-    }
-
-    pub fn from(name: String) -> User {
-        User { name }
+    pub fn new(name: &str) -> User {
+        User { name: name.to_string() }
     }
 }
 
@@ -55,13 +51,13 @@ mod tests {
 
     #[test]
     fn can_print() {
-        let user = User::new("Pinocchio".to_string());
+        let user = User::new("Pinocchio");
         print!("{}", user);
     }
 
     #[test]
     fn can_debug() {
-        let user = User::new("Pinocchio".to_string());
+        let user = User::new("Pinocchio");
         print!("{:?}", user);
     }
 
