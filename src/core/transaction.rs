@@ -1,8 +1,8 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::HashMap;
 
 use crate::core::user::User;
 
-type Amount = f32;
+pub type Amount = f32;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Benefit {
@@ -20,22 +20,22 @@ impl std::fmt::Display for Benefit {
     }
 }
 
-type AmountPerUser<'a> = HashMap<&'a User, Amount>;
-type BenefitsMap<'a> = HashMap<&'a User, Benefit>;
+pub type AmountPerUser = HashMap<User, Amount>;
+pub type BenefitsMap = HashMap<User, Benefit>;
 
-pub struct Transaction<'a> {
-    contributions: AmountPerUser<'a>,
-    benefits: BenefitsMap<'a>
+pub struct Transaction {
+    contributions: AmountPerUser,
+    benefits: BenefitsMap
 }
 
-impl<'a> std::fmt::Display for Transaction<'a> {
+impl std::fmt::Display for Transaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Contributions: ")?;
         for (user, amount) in &self.contributions {
             write!(f, "{}: {}; ", user, amount)?;
         }
 
-        write!(f, "Beneficiaries: ");
+        write!(f, "Beneficiaries: ")?;
         for (user, benefit) in &self.benefits {
             write!(f, "{}: {}; ", user, benefit)?;
         }
@@ -44,114 +44,67 @@ impl<'a> std::fmt::Display for Transaction<'a> {
 }
 
 
-enum TransactionError {
+pub enum TransactionError {
     InsufficientBenefits{specified: Amount, spent: Amount},
     ExcessBenefits{specified: Amount, spent: Amount},
-    UnrecognisedUser(String)
+    UnrecognisedUser(User)
 }
 
-type TransactionResult = Result<(), TransactionError>;
+pub type TransactionResult<T> = Result<T, TransactionError>;
 
-pub struct Ledger<'a> {
-    balances: HashMap<User, Amount>,
-    transactions: Vec<Transaction<'a>>,
-    total_spend: Amount
-}
-
-impl<'a> Ledger<'a> {
-    pub fn new(user_names: Vec<String>) -> Ledger<'a> {
-        let mut balances = HashMap::new();
-
-        for name in user_names {
-            balances.insert(User::new(name), 0f32 as Amount);
-        }
-
-        return Ledger { balances, transactions: Vec::new(), total_spend: 0f32 as Amount };
+impl Transaction {
+    pub fn new(contributions: AmountPerUser, benefits: BenefitsMap) -> Transaction {
+        Transaction { contributions, benefits }
     }
 
-    pub fn get_users(&self) -> HashSet<&User> {
-        return self.balances.keys()
-            .map(|user| user).collect();
+    pub fn total_spending(&self) -> Amount {
+        return self.contributions.values().sum();
     }
 
-    pub fn get_user_by_name(&self, name: String) -> Option<&User> {
-        self.balances.keys()
-            .find_map(|user| if user.name == name { Some(user) } else {None})
-    }
-
-    fn update_balances(&mut self, changes: AmountPerUser) -> TransactionResult {
-        for (user, delta) in &changes {
-            match self.balances.get_mut(*user) {
-                Some(val) => *val += delta,
-                None => return Err(TransactionError::UnrecognisedUser(user.name.clone()))
-            }
-        }
-        return Ok(());
-    }
-
-    // TODO: separate into smaller functions
-    fn apply_transaction(&mut self, transaction: &'a Transaction) -> TransactionResult {
-        let mut balance_delta: AmountPerUser = self.balances.keys()
-            .map(|user| (user, 0.0)).collect();
-
-        // increase balance to contributors
-        for (user, contrib) in &transaction.contributions {
-            match balance_delta.get_mut(user) {
-                Some(val) => *val += contrib,
-                None => return Err(TransactionError::UnrecognisedUser(user.name.clone()))
-            }
-        }
-
-        // calculate total spending
-        let spending: Amount = transaction.contributions.values().sum();
-        self.total_spend += spending;
-
-        // calculate which beneficiary amounts are already specified
-        let specified_benefits: Amount = transaction.benefits.values()
+    pub fn specified_benefits(&self) -> Amount {
+        return self.benefits.values()
             .map(|benefit| match *benefit {
                 Benefit::Sum(val) => val,
                 _ => 0.0
             }).sum();
+    }
 
-        if specified_benefits > spending {
-            return Err(TransactionError::ExcessBenefits{specified: specified_benefits, spent: spending})
-        }
-
-        // count the number of "even" benefits
-        let num_evens = transaction.benefits.values()
+    pub fn num_even_benefits(&self) -> usize {
+        return self.benefits.values()
             .map(|benefit| match benefit {
                 Benefit::Even => true,
                 _ => false
             }).count();
+    }
 
-        let even_benefit_amt = spending - specified_benefits;
-        if even_benefit_amt > 0f32 && num_evens == 0 {
+    pub fn balance_updates(&self) -> TransactionResult<AmountPerUser> {
+        let mut balance_delta: AmountPerUser = HashMap::new();
+
+        let spending = self.total_spending();
+        let specified_benefits = self.specified_benefits();
+        if specified_benefits > spending {
+            return Err(TransactionError::ExcessBenefits{specified: specified_benefits, spent: spending})
+        }
+
+        let num_evens = self.num_even_benefits();
+        let total_amount_evens = spending - specified_benefits;
+        if total_amount_evens > 0f32 && num_evens == 0 {
             return Err(TransactionError::InsufficientBenefits{specified: specified_benefits, spent: spending})
         }
 
-        let benefit_per_even = spending / (num_evens as f32);
+        let benefit_per_even = total_amount_evens / (num_evens as f32);
 
-        // update beneficiaries' balances
-        for (user, benefit) in &transaction.benefits {
-            let amount_benefit: Amount = match *benefit {
+        for (user, contrib) in &self.contributions {
+            balance_delta.insert(user.clone(), *contrib);
+        }
+        for (user, benefit) in &self.benefits {
+            let final_benefit = match *benefit {
                 Benefit::Sum(val) => val,
                 Benefit::Even => benefit_per_even
             };
-
-            match balance_delta.get_mut(user) {
-                Some(val) => *val -= amount_benefit,
-                None => return Err(TransactionError::UnrecognisedUser(user.name.clone()))
-            }
+            *balance_delta.entry(user.clone()).or_insert(0f32) -= final_benefit;
         }
 
-        return self.update_balances(balance_delta);
-    }
-
-    // TODO: add transactions
-    pub fn add_transaction(&mut self, contributions: AmountPerUser<'a>, benefits: BenefitsMap<'a>) -> TransactionResult {
-        let transaction = Transaction{contributions, benefits};
-        self.apply_transaction(&transaction)?;
-        self.transactions.push(transaction);
-        Ok(())
+        return Ok(balance_delta);
     }
 }
