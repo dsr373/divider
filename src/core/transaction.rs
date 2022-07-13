@@ -25,7 +25,8 @@ pub type BenefitPerUser = Vec<(User, Benefit)>;
 
 pub struct Transaction {
     contributions: AmountPerUser,
-    benefits: BenefitPerUser
+    benefits: BenefitPerUser,
+    pub is_direct: bool
 }
 
 impl std::fmt::Display for Transaction {
@@ -54,7 +55,11 @@ pub type TransactionResult<T> = Result<T, TransactionError>;
 
 impl Transaction {
     pub fn new(contributions: AmountPerUser, benefits: BenefitPerUser) -> Transaction {
-        Transaction { contributions, benefits }
+        Transaction { contributions, benefits, is_direct: false }
+    }
+
+    pub fn new_direct(contributions: AmountPerUser, benefits: BenefitPerUser) -> Transaction {
+        Transaction { contributions, benefits, is_direct: true }
     }
 
     pub fn total_spending(&self) -> Amount {

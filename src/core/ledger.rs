@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::core::user::User;
-use crate::core::transaction::{Transaction, Amount, TransactionResult, TransactionError, AmountPerUser, BenefitPerUser};
+use crate::core::transaction::{Transaction, Amount, TransactionResult, TransactionError, AmountPerUser, BenefitPerUser, Benefit};
 
 pub struct Ledger {
     balances: HashMap<User, Amount>,
@@ -10,7 +10,7 @@ pub struct Ledger {
 }
 
 impl Ledger {
-    pub fn new(user_names: Vec<String>) -> Ledger {
+    pub fn new(user_names: Vec<&str>) -> Ledger {
         let mut balances = HashMap::new();
 
         for name in user_names {
@@ -25,7 +25,7 @@ impl Ledger {
             .map(|user| user).collect();
     }
 
-    pub fn get_user_by_name(&self, name: String) -> Option<&User> {
+    pub fn get_user_by_name(&self, name: &str) -> Option<&User> {
         self.balances.keys()
             .find_map(|user| if user.name == name { Some(user) } else {None})
     }
@@ -42,16 +42,53 @@ impl Ledger {
 
     // TODO: separate into smaller functions
     fn apply_transaction(&mut self, transaction: &Transaction) -> TransactionResult<()> {
-        self.total_spend += transaction.total_spending();
+        if transaction.is_direct {
+            self.total_spend += transaction.total_spending();
+        }
         let balance_updates = transaction.balance_updates()?;
         return self.update_balances(balance_updates);
     }
 
-    // TODO: add transactions
-    pub fn add_transaction(&mut self, contributions: AmountPerUser, benefits: BenefitPerUser) -> TransactionResult<()> {
+    pub fn add_expense(&mut self, contributions: AmountPerUser, benefits: BenefitPerUser) -> TransactionResult<()> {
         let transaction = Transaction::new(contributions, benefits);
         self.apply_transaction(&transaction)?;
         self.transactions.push(transaction);
-        Ok(())
+        return Ok(());
+    }
+
+    pub fn add_transfer(&mut self, from: &User, to: &User, amount: Amount) -> TransactionResult<()> {
+        let transaction = Transaction::new_direct(
+            vec![(from.clone(), amount)],
+            vec![(to.clone(), Benefit::Sum(amount))]
+        );
+        self.apply_transaction(&transaction)?;
+        self.transactions.push(transaction);
+        return Ok(());
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::core::{Ledger, Transaction, User};
+
+    #[test]
+    fn create_and_get_users() {
+        let ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
+
+        let users = ledger.get_users();
+
+        assert_eq!(users.len(), 4);
+        assert!(users.contains(&User::new("Bilbo")));
+        assert!(users.contains(&User::new("Frodo")));
+        assert!(users.contains(&User::new("Legolas")));
+        assert!(users.contains(&User::new("Gimli")));
+    }
+
+    #[test]
+    fn create_and_find_user() {
+        let ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
+        let frodo = ledger.get_user_by_name("Frodo").unwrap();
+        assert_eq!(frodo, &User::new("Frodo"));
     }
 }

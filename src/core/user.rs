@@ -53,6 +53,7 @@ mod tests {
     fn can_print() {
         let user = User::new("Pinocchio");
         print!("{}", user);
+        assert_eq!(user.to_string(), "Pinocchio");
     }
 
     #[test]
@@ -60,6 +61,4 @@ mod tests {
         let user = User::new("Pinocchio");
         print!("{:?}", user);
     }
-
-
 }
