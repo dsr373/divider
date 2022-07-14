@@ -72,6 +72,8 @@ impl Ledger {
 mod tests {
     use crate::core::{Ledger, Transaction, User};
 
+    use crate::core::transaction::Benefit;
+
     #[test]
     fn create_and_get_users() {
         let ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
@@ -90,5 +92,69 @@ mod tests {
         let ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
         let frodo = ledger.get_user_by_name("Frodo").unwrap();
         assert_eq!(frodo, &User::new("Frodo"));
+    }
+
+    #[test]
+    fn simple_transfer() {
+        let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
+
+        let bilbo = ledger.get_user_by_name("Bilbo").unwrap().to_owned();
+        let frodo = ledger.get_user_by_name("Frodo").unwrap().to_owned();
+
+        ledger.add_transfer(&bilbo, &frodo, 32.0).unwrap();
+
+        assert_eq!(*ledger.balances.get(&bilbo).unwrap(), 32.0);
+        assert_eq!(*ledger.balances.get(&bilbo).unwrap(), 32.0);
+        assert_eq!(*ledger.balances.get(&User::new("Gimli")).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn unrecognised_user() {
+        let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
+
+        let bilbo = User::new("Bilbo");
+        let merry = User::new("Merry");
+
+        let res = ledger.add_transfer(&bilbo, &merry, 32.0);
+
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn complex_expense() {
+        let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
+
+        let bilbo = ledger.get_user_by_name("Bilbo").unwrap().to_owned();
+        let frodo = ledger.get_user_by_name("Frodo").unwrap().to_owned();
+        let legolas = ledger.get_user_by_name("Legolas").unwrap().to_owned();
+        let gimli = ledger.get_user_by_name("Gimli").unwrap().to_owned();
+
+        ledger.add_expense(vec![
+            (bilbo.clone(), 60.0)
+        ], vec![
+            (frodo.clone(), Benefit::Even),
+            (legolas.clone(), Benefit::Even),
+            (bilbo.clone(), Benefit::Even)
+        ]).unwrap();
+
+        /* here:
+            Bilbo +60 -20 = +40
+            Legolas         -20
+            Frodo           -20
+         */
+
+        ledger.add_expense(vec![
+            (frodo.clone(), 30.0)
+        ], vec![
+            (frodo.clone(), Benefit::Even),
+            (legolas.clone(), Benefit::Sum(6.0)),
+            (gimli.clone(), Benefit::Even)
+        ]).unwrap();
+
+        assert_eq!(ledger.transactions.len(), 2);
+        assert_eq!(*ledger.balances.get(&bilbo).unwrap(), 40.0);
+        assert_eq!(*ledger.balances.get(&frodo).unwrap(), -2.0);
+        assert_eq!(*ledger.balances.get(&legolas).unwrap(), -26.0);
+        assert_eq!(*ledger.balances.get(&gimli).unwrap(), -12.0);
     }
 }
