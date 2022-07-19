@@ -2,10 +2,10 @@
 More of a wish list at this stage, to be honest.
 
 ## Core
- - [ ] add description on Transaction
- - [ ] remove the `.clones()`, at least in the interface if not in the core code
+ - [x] add description on Transaction
+ - [x] remove the `.clones()`, at least in the interface if not in the core code
  - [ ] check for nonsensical values like negative benefits/contributions
- - [ ] integrity check on a ledger by re-applying all transactions
+ - [x] integrity check on a ledger by re-applying all transactions
  - [ ] ledger "resolution": who pays who to close all debts
 
 ## Backend

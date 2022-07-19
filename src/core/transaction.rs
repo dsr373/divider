@@ -21,12 +21,27 @@ impl std::fmt::Display for Benefit {
 }
 
 pub type AmountPerUser = Vec<(User, Amount)>;
+pub type AmountPerUserRef<'a> = Vec<(&'a User, Amount)>;
 pub type BenefitPerUser = Vec<(User, Benefit)>;
+pub type BenefitPerUserRef<'a> = Vec<(&'a User, Benefit)>;
+
+trait ToOwnedUsers {
+    type WithOwnedUsers;
+    fn to_owned_users(&self) -> Self::WithOwnedUsers;
+}
+
+impl<'a, T: Copy> ToOwnedUsers for Vec<(&'a User, T)> {
+    type WithOwnedUsers = Vec<(User, T)>;
+    fn to_owned_users(&self) -> Self::WithOwnedUsers {
+        self.iter().map(|pair| (pair.0.to_owned(), pair.1)).collect()
+    }
+}
 
 pub struct Transaction {
     contributions: AmountPerUser,
     benefits: BenefitPerUser,
-    pub is_direct: bool
+    pub is_direct: bool,
+    pub description: String
 }
 
 impl std::fmt::Display for Transaction {
@@ -54,12 +69,20 @@ pub enum TransactionError {
 pub type TransactionResult<T> = Result<T, TransactionError>;
 
 impl Transaction {
-    pub fn new(contributions: AmountPerUser, benefits: BenefitPerUser) -> Transaction {
-        Transaction { contributions, benefits, is_direct: false }
+    pub fn new(contributions: AmountPerUserRef, benefits: BenefitPerUserRef, description: &str) -> Transaction {
+        Transaction {
+            contributions: contributions.to_owned_users(),
+            benefits: benefits.to_owned_users(),
+            is_direct: false,
+            description: description.to_owned() }
     }
 
-    pub fn new_direct(contributions: AmountPerUser, benefits: BenefitPerUser) -> Transaction {
-        Transaction { contributions, benefits, is_direct: true }
+    pub fn new_direct(contributions: AmountPerUserRef, benefits: BenefitPerUserRef, description: &str) -> Transaction {
+        Transaction {
+            contributions: contributions.to_owned_users(),
+            benefits: benefits.to_owned_users(),
+            is_direct: true,
+            description: description.to_owned() }
     }
 
     pub fn total_spending(&self) -> Amount {
@@ -129,14 +152,14 @@ mod tests {
         let legolas = User::new("Legolas");
         let gimli = User::new("Gimli");
 
-        let contrib: AmountPerUser = vec![(bilbo, 32.0)];
+        let contrib = vec![(&bilbo, 32.0)];
 
-        let benefit: BenefitPerUser = vec![
-            (legolas, Benefit::Even),
-            (gimli, Benefit::Sum(10.0))
+        let benefit = vec![
+            (&legolas, Benefit::Even),
+            (&gimli, Benefit::Sum(10.0))
         ];
 
-        let transaction = Transaction::new(contrib, benefit);
+        let transaction = Transaction::new(contrib, benefit, "");
         let repr = transaction.to_string();
 
         assert_eq!(repr, "Contributions: Bilbo: 32; Beneficiaries: Legolas: Even; Gimli: 10; ");
@@ -149,17 +172,17 @@ mod tests {
         let legolas = User::new("Legolas");
         let gimli = User::new("Gimli");
 
-        let contrib: AmountPerUser = vec![
-            (bilbo, 32.0),
-            (frodo, 12.0)
+        let contrib = vec![
+            (&bilbo, 32.0),
+            (&frodo, 12.0)
         ];
 
-        let benefit: BenefitPerUser = vec![
-            (legolas, Benefit::Even),
-            (gimli, Benefit::Sum(10.0))
+        let benefit = vec![
+            (&legolas, Benefit::Even),
+            (&gimli, Benefit::Sum(10.0))
         ];
 
-        let transaction = Transaction::new(contrib, benefit);
+        let transaction = Transaction::new(contrib, benefit, "");
         assert_eq!(transaction.total_spending(), 44.0);
     }
 
@@ -170,18 +193,18 @@ mod tests {
         let legolas = User::new("Legolas");
         let gimli = User::new("Gimli");
 
-        let contrib: AmountPerUser = vec![
-            (bilbo.clone(), 32.0),
-            (frodo.clone(), 12.0)
+        let contrib = vec![
+            (&bilbo, 32.0),
+            (&frodo, 12.0)
         ];
 
-        let benefit: BenefitPerUser = vec![
-            (legolas.clone(), Benefit::Even),
-            (frodo.clone(), Benefit::Even),
-            (gimli.clone(), Benefit::Sum(10.0))
+        let benefit = vec![
+            (&legolas, Benefit::Even),
+            (&frodo, Benefit::Even),
+            (&gimli, Benefit::Sum(10.0))
         ];
 
-        let transaction = Transaction::new(contrib, benefit);
+        let transaction = Transaction::new(contrib, benefit, "");
         let balance_delta = transaction.balance_updates().unwrap();
 
         assert_eq!(balance_delta.keys().len(), 4);
