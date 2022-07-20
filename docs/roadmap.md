@@ -7,6 +7,7 @@ More of a wish list at this stage, to be honest.
  - [ ] check for nonsensical values like negative benefits/contributions
  - [x] integrity check on a ledger by re-applying all transactions
  - [ ] ledger "resolution": who pays who to close all debts
+ - [ ] resolve issue of cloning users: hold/pass references, or owned objects, or smart pointers?
 
 ## Backend
 ### Json store for a ledger

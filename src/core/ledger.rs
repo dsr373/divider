@@ -104,7 +104,7 @@ impl Ledger {
 mod tests {
     use crate::core::{Ledger, User};
 
-    use crate::core::transaction::Benefit;
+    use crate::core::transaction::{Benefit, TransactionError};
 
     #[test]
     fn create_and_get_users() {
@@ -151,6 +151,7 @@ mod tests {
         let res = ledger.add_transfer(&bilbo, &merry, 32.0, "");
 
         assert!(res.is_err());
+        assert!(matches!(res, Err(TransactionError::UnrecognisedUser(..))));
     }
 
     #[test]
@@ -189,5 +190,57 @@ mod tests {
         assert_eq!(*ledger.balances.get(&frodo).unwrap(), -2.0);
         assert_eq!(*ledger.balances.get(&legolas).unwrap(), -26.0);
         assert_eq!(*ledger.balances.get(&gimli).unwrap(), -12.0);
+    }
+
+    #[test]
+    fn consistency_check() {
+        const interval: usize = Ledger::CONSISTENCY_CHECK_INTERVAL;
+
+        let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
+
+        let bilbo = ledger.get_user_by_name("Bilbo").unwrap().to_owned();
+        let frodo = ledger.get_user_by_name("Frodo").unwrap().to_owned();
+        let legolas = ledger.get_user_by_name("Legolas").unwrap().to_owned();
+        let gimli = ledger.get_user_by_name("Gimli").unwrap().to_owned();
+
+        let transaction_1_contrib = vec![(&bilbo, 60.0)];
+        let transaction_1_benefit = vec![(&frodo, Benefit::Even),
+            (&legolas, Benefit::Even),
+            (&bilbo, Benefit::Even)
+        ];
+
+        let transaction_2_contrib = vec![(&frodo, 30.0)];
+        let transaction_2_benefit = vec![
+            (&frodo, Benefit::Even),
+            (&legolas, Benefit::Sum(6.0)),
+            (&gimli, Benefit::Even)
+        ];
+
+        let repeated_transactions = (interval - 1)/2;
+
+        for _ in 0..repeated_transactions {
+            ledger.add_expense(transaction_1_contrib.clone(), transaction_1_benefit.clone(), "").unwrap();
+            ledger.add_expense(transaction_2_contrib.clone(), transaction_2_benefit.clone(), "").unwrap();
+        }
+
+        // before reapplying all
+        assert_eq!(*ledger.balances.get(&bilbo).unwrap(), (repeated_transactions as f32) * 40.0);
+        assert_eq!(*ledger.balances.get(&frodo).unwrap(), (repeated_transactions as f32) * -2.0);
+        assert_eq!(*ledger.balances.get(&legolas).unwrap(), (repeated_transactions as f32) * -26.0);
+        assert_eq!(*ledger.balances.get(&gimli).unwrap(), (repeated_transactions as f32) * -12.0);
+
+        // mess with one of the values
+        *ledger.balances.get_mut(&bilbo).unwrap() += 100.0;
+
+        // one of these should do the consistency check
+        ledger.add_expense(transaction_1_contrib.clone(), transaction_1_benefit.clone(), "").unwrap();
+        ledger.add_expense(transaction_2_contrib.clone(), transaction_2_benefit.clone(), "").unwrap();
+
+        // after reapplying all
+        assert_eq!(*ledger.balances.get(&bilbo).unwrap(), ((repeated_transactions + 1) as f32) * 40.0);
+        assert_eq!(*ledger.balances.get(&frodo).unwrap(), ((repeated_transactions + 1) as f32) * -2.0);
+        assert_eq!(*ledger.balances.get(&legolas).unwrap(), ((repeated_transactions + 1) as f32) * -26.0);
+        assert_eq!(*ledger.balances.get(&gimli).unwrap(), ((repeated_transactions + 1) as f32) * -12.0);
+
     }
 }
