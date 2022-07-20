@@ -37,6 +37,30 @@ impl Ledger {
             .find_map(|user| if user.name == name { Some(user) } else {None})
     }
 
+    pub fn add_expense(&mut self, contributions: AmountPerUserRef, benefits: BenefitPerUserRef, description: &str) -> TransactionResult<()> {
+        let transaction = Transaction::new(contributions, benefits, description);
+        self.add_transaction(transaction)
+    }
+
+    pub fn add_transfer(&mut self, from: &User, to: &User, amount: Amount, description: &str) -> TransactionResult<()> {
+        let transaction = Transaction::new_direct(
+            vec![(from, amount)],
+            vec![(to, Benefit::Sum(amount))],
+            description
+        );
+        self.add_transaction(transaction)
+    }
+
+    fn add_transaction(&mut self, transaction: Transaction) -> TransactionResult<()> {
+        Ledger::apply_transaction(&mut self.total_spend, &mut self.balances, &transaction)?;
+        self.transactions.push(transaction);
+
+        if self.needs_consistency_check() {
+            self.consistency_check()?;
+        }
+        return Ok(());
+    }
+
     fn update_balances(balances: &mut UserAmountMap, changes: UserAmountMap) -> TransactionResult<()> {
         for (user, delta) in &changes {
             match balances.get_mut(user) {
@@ -45,6 +69,15 @@ impl Ledger {
             }
         }
         return Ok(());
+    }
+
+    // TODO: separate into smaller functions
+    fn apply_transaction(total_spend: &mut Amount, balances: &mut UserAmountMap, transaction: &Transaction) -> TransactionResult<()> {
+        if transaction.is_direct {
+            *total_spend += transaction.total_spending();
+        }
+        let balance_updates = transaction.balance_updates()?;
+        return Ledger::update_balances(balances, balance_updates);
     }
 
     fn consistency_check(&mut self) -> TransactionResult<()> {
@@ -63,39 +96,6 @@ impl Ledger {
 
     fn needs_consistency_check(&self) -> bool {
         return self.transactions.len() % Self::CONSISTENCY_CHECK_INTERVAL == 0;
-    }
-
-    // TODO: separate into smaller functions
-    fn apply_transaction(total_spend: &mut Amount, balances: &mut UserAmountMap, transaction: &Transaction) -> TransactionResult<()> {
-        if transaction.is_direct {
-            *total_spend += transaction.total_spending();
-        }
-        let balance_updates = transaction.balance_updates()?;
-        return Ledger::update_balances(balances, balance_updates);
-    }
-
-    fn add_transaction(&mut self, transaction: Transaction) -> TransactionResult<()> {
-        Ledger::apply_transaction(&mut self.total_spend, &mut self.balances, &transaction)?;
-        self.transactions.push(transaction);
-
-        if self.needs_consistency_check() {
-            self.consistency_check()?;
-        }
-        return Ok(());
-    }
-
-    pub fn add_expense(&mut self, contributions: AmountPerUserRef, benefits: BenefitPerUserRef, description: &str) -> TransactionResult<()> {
-        let transaction = Transaction::new(contributions, benefits, description);
-        self.add_transaction(transaction)
-    }
-
-    pub fn add_transfer(&mut self, from: &User, to: &User, amount: Amount, description: &str) -> TransactionResult<()> {
-        let transaction = Transaction::new_direct(
-            vec![(from, amount)],
-            vec![(to, Benefit::Sum(amount))],
-            description
-        );
-        self.add_transaction(transaction)
     }
 }
 
