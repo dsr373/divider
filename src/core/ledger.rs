@@ -103,49 +103,61 @@ impl Ledger {
 #[cfg(test)]
 mod tests {
     use crate::core::{Ledger, User};
+    use crate::core::transaction::{Benefit, TransactionError, AmountPerUserRef, BenefitPerUserRef, TransactionResult};
 
-    use crate::core::transaction::{Benefit, TransactionError};
+    use rstest::{fixture, rstest};
 
-    #[test]
-    fn create_and_get_users() {
-        let ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
+    type User4 = (User, User, User, User);
 
-        let users = ledger.get_users();
-
-        assert_eq!(users.len(), 4);
-        assert!(users.contains(&User::new("Bilbo")));
-        assert!(users.contains(&User::new("Frodo")));
-        assert!(users.contains(&User::new("Legolas")));
-        assert!(users.contains(&User::new("Gimli")));
-        assert!(!users.contains(&User::new("Merry")));
+    #[fixture]
+    fn ledger() -> Ledger {
+        return Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
     }
 
-    #[test]
-    fn create_and_find_user() {
-        let ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
+    #[fixture]
+    fn users(ledger: Ledger) -> User4 {
+        let bilbo = ledger.get_user_by_name("Bilbo").unwrap().to_owned();
+        let frodo = ledger.get_user_by_name("Frodo").unwrap().to_owned();
+        let legolas = ledger.get_user_by_name("Legolas").unwrap().to_owned();
+        let gimli = ledger.get_user_by_name("Gimli").unwrap().to_owned();
+
+        return (bilbo, frodo, legolas, gimli);
+    }
+
+    #[rstest]
+    fn create_and_get_users(ledger: Ledger, users: User4) {
+        let (bilbo, frodo, legolas, gimli) = users;
+
+        let users_set = ledger.get_users();
+
+        assert_eq!(users_set.len(), 4);
+        assert!(users_set.contains(&bilbo));
+        assert!(users_set.contains(&frodo));
+        assert!(users_set.contains(&legolas));
+        assert!(users_set.contains(&gimli));
+        assert!(!users_set.contains(&User::new("Merry")));
+    }
+
+    #[rstest]
+    fn create_and_find_user(ledger: Ledger) {
         let frodo = ledger.get_user_by_name("Frodo").unwrap();
         assert_eq!(frodo, &User::new("Frodo"));
     }
 
-    #[test]
-    fn simple_transfer() {
-        let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
-
-        let bilbo = ledger.get_user_by_name("Bilbo").unwrap().to_owned();
-        let frodo = ledger.get_user_by_name("Frodo").unwrap().to_owned();
+    #[rstest]
+    fn simple_transfer(mut ledger: Ledger, users: User4) {
+        let (bilbo, frodo, _, gimli) = users;
 
         ledger.add_transfer(&bilbo, &frodo, 32.0, "").unwrap();
 
         assert_eq!(*ledger.balances.get(&bilbo).unwrap(), 32.0);
-        assert_eq!(*ledger.balances.get(&bilbo).unwrap(), 32.0);
-        assert_eq!(*ledger.balances.get(&User::new("Gimli")).unwrap(), 0.0);
+        assert_eq!(*ledger.balances.get(&frodo).unwrap(), -32.0);
+        assert_eq!(*ledger.balances.get(&gimli).unwrap(), 0.0);
     }
 
-    #[test]
-    fn unrecognised_user() {
-        let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
-
-        let bilbo = User::new("Bilbo");
+    #[rstest]
+    fn unrecognised_user(mut ledger: Ledger, users: User4) {
+        let bilbo = users.0;
         let merry = User::new("Merry");
 
         let res = ledger.add_transfer(&bilbo, &merry, 32.0, "");
@@ -154,93 +166,71 @@ mod tests {
         assert!(matches!(res, Err(TransactionError::UnrecognisedUser(..))));
     }
 
-    #[test]
-    fn complex_expense() {
-        let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
-
-        let bilbo = ledger.get_user_by_name("Bilbo").unwrap().to_owned();
-        let frodo = ledger.get_user_by_name("Frodo").unwrap().to_owned();
-        let legolas = ledger.get_user_by_name("Legolas").unwrap().to_owned();
-        let gimli = ledger.get_user_by_name("Gimli").unwrap().to_owned();
-
-        ledger.add_expense(vec![
-            (&bilbo, 60.0)
-        ], vec![
-            (&frodo, Benefit::Even),
-            (&legolas, Benefit::Even),
-            (&bilbo, Benefit::Even)
-        ], "").unwrap();
-
-        /* here:
-            Bilbo +60 -20 = +40
-            Legolas         -20
-            Frodo           -20
-         */
-
-        ledger.add_expense(vec![
-            (&frodo, 30.0)
-        ], vec![
-            (&frodo, Benefit::Even),
-            (&legolas, Benefit::Sum(6.0)),
-            (&gimli, Benefit::Even)
-        ], "").unwrap();
-
-        assert_eq!(ledger.transactions.len(), 2);
-        assert_eq!(*ledger.balances.get(&bilbo).unwrap(), 40.0);
-        assert_eq!(*ledger.balances.get(&frodo).unwrap(), -2.0);
-        assert_eq!(*ledger.balances.get(&legolas).unwrap(), -26.0);
-        assert_eq!(*ledger.balances.get(&gimli).unwrap(), -12.0);
+    fn add_transaction_bilbo(ledger: &mut Ledger, users: &User4) -> TransactionResult<()> {
+        let (bilbo, frodo, legolas, _) = users;
+        let contributions = vec![(bilbo, 60.0)];
+        let benefits = vec![
+            (frodo, Benefit::Even),
+            (legolas, Benefit::Even),
+            (bilbo, Benefit::Even)
+        ];
+        ledger.add_expense(contributions, benefits, "")
     }
 
-    #[test]
-    fn consistency_check() {
+    fn add_transaction_frodo(ledger: &mut Ledger, users: &User4) -> TransactionResult<()> {
+        let (_, frodo, legolas, gimli) = users;
+        let contributions = vec![(frodo, 30.0)];
+        let benefits = vec![
+            (frodo, Benefit::Even),
+            (legolas, Benefit::Sum(6.0)),
+            (gimli, Benefit::Even)
+        ];
+        ledger.add_expense(contributions, benefits, "")
+    }
+
+    #[rstest]
+    fn complex_expense(mut ledger: Ledger, users: User4) {
+        let (bilbo, frodo, legolas, gimli) = &users;
+
+        add_transaction_bilbo(&mut ledger, &users).unwrap();
+        add_transaction_frodo(&mut ledger, &users).unwrap();
+
+        assert_eq!(ledger.transactions.len(), 2);
+        assert_eq!(*ledger.balances.get(bilbo).unwrap(), 40.0);
+        assert_eq!(*ledger.balances.get(frodo).unwrap(), -2.0);
+        assert_eq!(*ledger.balances.get(legolas).unwrap(), -26.0);
+        assert_eq!(*ledger.balances.get(gimli).unwrap(), -12.0);
+    }
+
+    #[rstest]
+    fn consistency_check(mut ledger: Ledger, users: User4) {
         const interval: usize = Ledger::CONSISTENCY_CHECK_INTERVAL;
-
-        let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
-
-        let bilbo = ledger.get_user_by_name("Bilbo").unwrap().to_owned();
-        let frodo = ledger.get_user_by_name("Frodo").unwrap().to_owned();
-        let legolas = ledger.get_user_by_name("Legolas").unwrap().to_owned();
-        let gimli = ledger.get_user_by_name("Gimli").unwrap().to_owned();
-
-        let transaction_1_contrib = vec![(&bilbo, 60.0)];
-        let transaction_1_benefit = vec![(&frodo, Benefit::Even),
-            (&legolas, Benefit::Even),
-            (&bilbo, Benefit::Even)
-        ];
-
-        let transaction_2_contrib = vec![(&frodo, 30.0)];
-        let transaction_2_benefit = vec![
-            (&frodo, Benefit::Even),
-            (&legolas, Benefit::Sum(6.0)),
-            (&gimli, Benefit::Even)
-        ];
+        let (bilbo, frodo, legolas, gimli) = &users;
 
         let repeated_transactions = (interval - 1)/2;
 
         for _ in 0..repeated_transactions {
-            ledger.add_expense(transaction_1_contrib.clone(), transaction_1_benefit.clone(), "").unwrap();
-            ledger.add_expense(transaction_2_contrib.clone(), transaction_2_benefit.clone(), "").unwrap();
+            add_transaction_bilbo(&mut ledger, &users).unwrap();
+            add_transaction_frodo(&mut ledger, &users).unwrap();
         }
 
         // before reapplying all
-        assert_eq!(*ledger.balances.get(&bilbo).unwrap(), (repeated_transactions as f32) * 40.0);
-        assert_eq!(*ledger.balances.get(&frodo).unwrap(), (repeated_transactions as f32) * -2.0);
-        assert_eq!(*ledger.balances.get(&legolas).unwrap(), (repeated_transactions as f32) * -26.0);
-        assert_eq!(*ledger.balances.get(&gimli).unwrap(), (repeated_transactions as f32) * -12.0);
+        assert_eq!(*ledger.balances.get(bilbo).unwrap(), (repeated_transactions as f32) * 40.0);
+        assert_eq!(*ledger.balances.get(frodo).unwrap(), (repeated_transactions as f32) * -2.0);
+        assert_eq!(*ledger.balances.get(legolas).unwrap(), (repeated_transactions as f32) * -26.0);
+        assert_eq!(*ledger.balances.get(gimli).unwrap(), (repeated_transactions as f32) * -12.0);
 
         // mess with one of the values
         *ledger.balances.get_mut(&bilbo).unwrap() += 100.0;
 
         // one of these should do the consistency check
-        ledger.add_expense(transaction_1_contrib.clone(), transaction_1_benefit.clone(), "").unwrap();
-        ledger.add_expense(transaction_2_contrib.clone(), transaction_2_benefit.clone(), "").unwrap();
+        add_transaction_bilbo(&mut ledger, &users).unwrap();
+        add_transaction_frodo(&mut ledger, &users).unwrap();
 
         // after reapplying all
-        assert_eq!(*ledger.balances.get(&bilbo).unwrap(), ((repeated_transactions + 1) as f32) * 40.0);
-        assert_eq!(*ledger.balances.get(&frodo).unwrap(), ((repeated_transactions + 1) as f32) * -2.0);
-        assert_eq!(*ledger.balances.get(&legolas).unwrap(), ((repeated_transactions + 1) as f32) * -26.0);
-        assert_eq!(*ledger.balances.get(&gimli).unwrap(), ((repeated_transactions + 1) as f32) * -12.0);
-
+        assert_eq!(*ledger.balances.get(bilbo).unwrap(), ((repeated_transactions + 1) as f32) * 40.0);
+        assert_eq!(*ledger.balances.get(frodo).unwrap(), ((repeated_transactions + 1) as f32) * -2.0);
+        assert_eq!(*ledger.balances.get(legolas).unwrap(), ((repeated_transactions + 1) as f32) * -26.0);
+        assert_eq!(*ledger.balances.get(gimli).unwrap(), ((repeated_transactions + 1) as f32) * -12.0);
     }
 }
