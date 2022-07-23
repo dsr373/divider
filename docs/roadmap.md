@@ -10,6 +10,8 @@ More of a wish list at this stage, to be honest.
  - [ ] resolve issue of cloning users: hold/pass references, or owned objects, or smart pointers?
 
 ## Backend
+ - [ ] define common interface for a data store
+
 ### Json store for a ledger
  - [ ] define schema for transaction
  - [ ] define schema for whole ledger?

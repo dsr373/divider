@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
+use serde::{Serialize, Deserialize};
+
 use crate::core::user::User;
 
 pub type Amount = f32;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Benefit {
     Sum(Amount),
     Even
@@ -25,6 +27,11 @@ pub type AmountPerUserRef<'a> = Vec<(&'a User, Amount)>;
 pub type BenefitPerUser = Vec<(User, Benefit)>;
 pub type BenefitPerUserRef<'a> = Vec<(&'a User, Benefit)>;
 
+/// Trait turning a type with user borrows (e.g. `&'a User`)
+/// into an equivalent type with owned users. It's helpful
+/// to avoid complex reference structures. Maybe not the
+/// best solution, potentially shared ownership of users will
+/// be required in the future.
 trait ToOwnedUsers {
     type WithOwnedUsers;
     fn to_owned_users(&self) -> Self::WithOwnedUsers;
@@ -37,6 +44,7 @@ impl<'a, T: Copy> ToOwnedUsers for Vec<(&'a User, T)> {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Transaction {
     contributions: AmountPerUser,
     benefits: BenefitPerUser,
@@ -141,16 +149,24 @@ impl Transaction {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashSet, HashMap};
     use crate::core::User;
     use crate::core::Transaction;
-    use crate::core::transaction::{AmountPerUser, Benefit, BenefitPerUser};
+    use crate::core::transaction::Benefit;
 
-    #[test]
-    fn can_print() {
+    use rstest::{fixture, rstest};
+
+    #[fixture]
+    fn users() -> (User, User, User, User) {
         let bilbo = User::new("Bilbo");
+        let frodo = User::new("Frodo");
         let legolas = User::new("Legolas");
         let gimli = User::new("Gimli");
+        return (bilbo, frodo, legolas, gimli);
+    }
+
+    #[rstest]
+    fn can_print(users: (User, User, User, User)) {
+        let (bilbo, _, legolas, gimli) = users;
 
         let contrib = vec![(&bilbo, 32.0)];
 
@@ -165,34 +181,9 @@ mod tests {
         assert_eq!(repr, "Contributions: Bilbo: 32; Beneficiaries: Legolas: Even; Gimli: 10; ");
     }
 
-    #[test]
-    fn total_spent() {
-        let bilbo = User::new("Bilbo");
-        let frodo = User::new("Frodo");
-        let legolas = User::new("Legolas");
-        let gimli = User::new("Gimli");
-
-        let contrib = vec![
-            (&bilbo, 32.0),
-            (&frodo, 12.0)
-        ];
-
-        let benefit = vec![
-            (&legolas, Benefit::Even),
-            (&gimli, Benefit::Sum(10.0))
-        ];
-
-        let transaction = Transaction::new(contrib, benefit, "");
-        assert_eq!(transaction.total_spending(), 44.0);
-    }
-
-    #[test]
-    fn balance_distribution() {
-        let bilbo = User::new("Bilbo");
-        let frodo = User::new("Frodo");
-        let legolas = User::new("Legolas");
-        let gimli = User::new("Gimli");
-
+    #[fixture]
+    fn transaction(users: (User, User, User, User)) -> Transaction {
+        let (bilbo, frodo, legolas, gimli) = users;
         let contrib = vec![
             (&bilbo, 32.0),
             (&frodo, 12.0)
@@ -204,7 +195,17 @@ mod tests {
             (&gimli, Benefit::Sum(10.0))
         ];
 
-        let transaction = Transaction::new(contrib, benefit, "");
+        return Transaction::new(contrib, benefit, "");
+    }
+
+    #[rstest]
+    fn total_spent(transaction: Transaction) {
+        assert_eq!(transaction.total_spending(), 44.0);
+    }
+
+    #[rstest]
+    fn balance_distribution(users: (User, User, User, User), transaction: Transaction) {
+        let (bilbo, frodo, legolas, gimli) = users;
         let balance_delta = transaction.balance_updates().unwrap();
 
         assert_eq!(balance_delta.keys().len(), 4);

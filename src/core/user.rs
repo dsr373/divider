@@ -1,11 +1,12 @@
 use std::fmt;
+use serde::{Serialize, Deserialize};
 // use std::collections::HashSet;
 // use std::sync::RwLock;
 
 // use rand::Rng;
 // use rand::prelude::ThreadRng;
 
-#[derive(Eq, PartialEq, Clone, Hash)]
+#[derive(Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
 pub struct User {
     // pub id: usize,
     pub name: String
