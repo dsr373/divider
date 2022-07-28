@@ -32,13 +32,32 @@ mod tests {
         return Transaction::new(contrib, benefit, "");
     }
 
+    #[fixture]
+    fn transaction_json() -> serde_json::Value {
+        json!({
+            "contributions": [
+                [{"name": "Bilbo"}, 32.0],
+                [{"name": "Frodo"}, 12.0]
+            ],
+            "benefits": [
+                [{"name": "Legolas"}, "Even"],
+                [{"name": "Frodo"}, "Even"],
+                [{"name": "Gimli"}, {"Sum": 10.0}],
+            ],
+            "is_direct": false,
+            "description": ""
+        })
+    }
+
     #[rstest]
-    fn transaction_serialize(transaction: Transaction) {
-        let repr = serde_json::to_string_pretty(&transaction).unwrap();
-        println!("{}", repr);
+    fn transaction_serialize(transaction: Transaction, transaction_json: serde_json::Value) {
+        let value = serde_json::to_value(&transaction).unwrap();
+        assert_eq!(value, transaction_json);
+    }
 
-        let parsed = serde_json::from_str::<Transaction>(&repr).unwrap();
-
+    #[rstest]
+    fn transaction_deserialize(transaction: Transaction, transaction_json: serde_json::Value) {
+        let parsed = serde_json::from_value::<Transaction>(transaction_json).unwrap();
         assert_eq!(transaction.description, parsed.description);
         assert_eq!(transaction.is_direct, parsed.is_direct);
         assert_eq!(transaction.total_spending(), parsed.total_spending());
