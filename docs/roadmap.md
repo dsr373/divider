@@ -25,6 +25,7 @@ More of a wish list at this stage, to be honest.
 
 ## Longer term goals
  - [ ] graphical UI
+ - [ ] client/server arch
  - [ ] phone app
  - [ ] sharing of ledger with other people
  - [ ] authentication?
