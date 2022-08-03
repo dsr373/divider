@@ -49,6 +49,20 @@ mod tests {
         })
     }
 
+    #[fixture]
+    fn ledger_json(transaction_json: serde_json::Value) -> serde_json::Value {
+        json!({
+            "balances": [
+                [{"name": "Bilbo"}, 32.0],
+                [{"name": "Frodo"}, -5.0],
+                [{"name": "Legolas"}, -17.0],
+                [{"name": "Gimli"}, -10.0],
+            ],
+            "total_spend": 44.0,
+            "transactions": [transaction_json]
+        })
+    }
+
     #[rstest]
     fn transaction_serialize(transaction: Transaction, transaction_json: serde_json::Value) {
         let value = serde_json::to_value(&transaction).unwrap();
@@ -62,5 +76,13 @@ mod tests {
         assert_eq!(transaction.is_direct, parsed.is_direct);
         assert_eq!(transaction.total_spending(), parsed.total_spending());
         assert_eq!(transaction.balance_updates().unwrap(), parsed.balance_updates().unwrap());
+    }
+
+    #[rstest]
+    fn ledger_serialize(transaction: Transaction, ledger_json: serde_json::Value) {
+        let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
+        ledger.add_transaction(transaction).unwrap();
+        let serialised = serde_json::to_value(&ledger).unwrap();
+        assert_eq!(serialised, ledger_json);
     }
 }

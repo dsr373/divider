@@ -1,0 +1,1 @@
+{"balances":[[{"name":"Bilbo"},32.0],[{"name":"Frodo"},-5.0],[{"name":"Legolas"},-17.0],[{"name":"Gimli"},-10.0]],"total_spend":44.0,"transactions":[{"benefits":[[{"name":"Legolas"},"Even"],[{"name":"Frodo"},"Even"],[{"name":"Gimli"},{"Sum":10.0}]],"contributions":[[{"name":"Bilbo"},32.0],[{"name":"Frodo"},12.0]],"description":"","is_direct":false}]}

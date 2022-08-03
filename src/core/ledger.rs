@@ -6,9 +6,14 @@ use crate::core::transaction::{
     AmountPerUserRef, BenefitPerUserRef,
     Benefit, Amount};
 
+use serde::{Serialize, Deserialize};
+
 type UserAmountMap = HashMap<User, Amount>;
 
+#[derive(Serialize, Deserialize)]
 pub struct Ledger {
+    // FIXME: UserAmountMap won't serialise because you can't have objects as keys in an object
+    // so it must be turned into a vector of pairs before serialising
     balances: UserAmountMap,
     transactions: Vec<Transaction>,
     total_spend: Amount
@@ -32,6 +37,12 @@ impl Ledger {
             .map(|user| user).collect();
     }
 
+    pub fn get_balances(&self) -> UserAmountMap {
+        return self.balances.iter()
+            .map(|pair| (pair.0.to_owned(), pair.1.to_owned()))
+            .collect();
+    }
+
     pub fn get_user_by_name(&self, name: &str) -> Option<&User> {
         self.balances.keys()
             .find_map(|user| if user.name == name { Some(user) } else {None})
@@ -51,7 +62,7 @@ impl Ledger {
         self.add_transaction(transaction)
     }
 
-    fn add_transaction(&mut self, transaction: Transaction) -> TransactionResult<()> {
+    pub fn add_transaction(&mut self, transaction: Transaction) -> TransactionResult<()> {
         Ledger::apply_transaction(&mut self.total_spend, &mut self.balances, &transaction)?;
         self.transactions.push(transaction);
 
@@ -71,7 +82,6 @@ impl Ledger {
         return Ok(());
     }
 
-    // TODO: separate into smaller functions
     fn apply_transaction(total_spend: &mut Amount, balances: &mut UserAmountMap, transaction: &Transaction) -> TransactionResult<()> {
         if transaction.is_direct {
             *total_spend += transaction.total_spending();
@@ -166,7 +176,7 @@ mod tests {
         assert!(matches!(res, Err(TransactionError::UnrecognisedUser(..))));
     }
 
-    fn add_transaction_bilbo(ledger: &mut Ledger, users: &User4) -> TransactionResult<()> {
+    fn add_transaction_bilbo(ledger: &mut Ledger, users: &User4) {
         let (bilbo, frodo, legolas, _) = users;
         let contributions = vec![(bilbo, 60.0)];
         let benefits = vec![
@@ -174,10 +184,10 @@ mod tests {
             (legolas, Benefit::Even),
             (bilbo, Benefit::Even)
         ];
-        ledger.add_expense(contributions, benefits, "")
+        ledger.add_expense(contributions, benefits, "").unwrap()
     }
 
-    fn add_transaction_frodo(ledger: &mut Ledger, users: &User4) -> TransactionResult<()> {
+    fn add_transaction_frodo(ledger: &mut Ledger, users: &User4) {
         let (_, frodo, legolas, gimli) = users;
         let contributions = vec![(frodo, 30.0)];
         let benefits = vec![
@@ -185,15 +195,15 @@ mod tests {
             (legolas, Benefit::Sum(6.0)),
             (gimli, Benefit::Even)
         ];
-        ledger.add_expense(contributions, benefits, "")
+        ledger.add_expense(contributions, benefits, "").unwrap()
     }
 
     #[rstest]
     fn complex_expense(mut ledger: Ledger, users: User4) {
         let (bilbo, frodo, legolas, gimli) = &users;
 
-        add_transaction_bilbo(&mut ledger, &users).unwrap();
-        add_transaction_frodo(&mut ledger, &users).unwrap();
+        add_transaction_bilbo(&mut ledger, &users);
+        add_transaction_frodo(&mut ledger, &users);
 
         assert_eq!(ledger.transactions.len(), 2);
         assert_eq!(*ledger.balances.get(bilbo).unwrap(), 40.0);
@@ -210,8 +220,8 @@ mod tests {
         let repeated_transactions = (interval - 1)/2;
 
         for _ in 0..repeated_transactions {
-            add_transaction_bilbo(&mut ledger, &users).unwrap();
-            add_transaction_frodo(&mut ledger, &users).unwrap();
+            add_transaction_bilbo(&mut ledger, &users);
+            add_transaction_frodo(&mut ledger, &users);
         }
 
         // before reapplying all
@@ -224,8 +234,8 @@ mod tests {
         *ledger.balances.get_mut(&bilbo).unwrap() += 100.0;
 
         // one of these should do the consistency check
-        add_transaction_bilbo(&mut ledger, &users).unwrap();
-        add_transaction_frodo(&mut ledger, &users).unwrap();
+        add_transaction_bilbo(&mut ledger, &users);
+        add_transaction_frodo(&mut ledger, &users);
 
         // after reapplying all
         assert_eq!(*ledger.balances.get(bilbo).unwrap(), ((repeated_transactions + 1) as f32) * 40.0);
