@@ -4,7 +4,7 @@ mod tests {
     use crate::core::transaction::Benefit;
 
     use rstest::{fixture, rstest};
-    use serde_json::{to_string, json};
+    use serde_json::json;
 
     #[fixture]
     fn users() -> (User, User, User, User) {
@@ -78,11 +78,27 @@ mod tests {
         assert_eq!(transaction.balance_updates().unwrap(), parsed.balance_updates().unwrap());
     }
 
-    #[rstest]
-    fn ledger_serialize(transaction: Transaction, ledger_json: serde_json::Value) {
+    #[fixture]
+    fn ledger(transaction: Transaction) -> Ledger {
         let mut ledger = Ledger::new(vec!["Bilbo", "Frodo", "Legolas", "Gimli"]);
         ledger.add_transaction(transaction).unwrap();
+        return ledger;
+    }
+
+    #[rstest]
+    fn ledger_serialize(ledger: Ledger, ledger_json: serde_json::Value) {
         let serialised = serde_json::to_value(&ledger).unwrap();
-        assert_eq!(serialised, ledger_json);
+        assert_eq!(serialised["transactions"], ledger_json["transactions"]);
+        assert_eq!(serialised["total_spend"], ledger_json["total_spend"]);
+        for v in ledger_json["balances"].as_array().unwrap() {
+            assert!(serialised["balances"].as_array().unwrap().contains(&v));
+        }
+    }
+
+    #[rstest]
+    fn ledger_deserialize(ledger: Ledger, ledger_json: serde_json::Value) {
+        let deserialised = serde_json::from_value::<Ledger>(ledger_json).unwrap();
+        assert_eq!(deserialised.get_users(), ledger.get_users());
+        assert_eq!(deserialised.get_balances(), ledger.get_balances());
     }
 }

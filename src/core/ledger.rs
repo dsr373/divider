@@ -7,17 +7,21 @@ use crate::core::transaction::{
     Benefit, Amount};
 
 use serde::{Serialize, Deserialize};
+use serde_with::serde_as;
 
 type UserAmountMap = HashMap<User, Amount>;
 
+#[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct Ledger {
     // FIXME: UserAmountMap won't serialise because you can't have objects as keys in an object
     // so it must be turned into a vector of pairs before serialising
+    #[serde_as(as = "Vec<(_, _)>")]
     balances: UserAmountMap,
     transactions: Vec<Transaction>,
     total_spend: Amount
 }
+
 
 impl Ledger {
     const CONSISTENCY_CHECK_INTERVAL: usize = 100;
@@ -83,7 +87,7 @@ impl Ledger {
     }
 
     fn apply_transaction(total_spend: &mut Amount, balances: &mut UserAmountMap, transaction: &Transaction) -> TransactionResult<()> {
-        if transaction.is_direct {
+        if !transaction.is_direct {
             *total_spend += transaction.total_spending();
         }
         let balance_updates = transaction.balance_updates()?;
@@ -160,6 +164,7 @@ mod tests {
 
         ledger.add_transfer(&bilbo, &frodo, 32.0, "").unwrap();
 
+        assert_eq!(ledger.total_spend, 0.0);
         assert_eq!(*ledger.balances.get(&bilbo).unwrap(), 32.0);
         assert_eq!(*ledger.balances.get(&frodo).unwrap(), -32.0);
         assert_eq!(*ledger.balances.get(&gimli).unwrap(), 0.0);
@@ -206,6 +211,7 @@ mod tests {
         add_transaction_frodo(&mut ledger, &users);
 
         assert_eq!(ledger.transactions.len(), 2);
+        assert_eq!(ledger.total_spend, 90.0);
         assert_eq!(*ledger.balances.get(bilbo).unwrap(), 40.0);
         assert_eq!(*ledger.balances.get(frodo).unwrap(), -2.0);
         assert_eq!(*ledger.balances.get(legolas).unwrap(), -26.0);
