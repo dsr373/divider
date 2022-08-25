@@ -1,4 +1,4 @@
-use divider::{User, Ledger};
+use divider::{User, Ledger, transaction::{Amount, Benefit}};
 
 use std::path::PathBuf;
 use std::fs;
@@ -22,9 +22,13 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Subcommands {
     /// Read and display balances
-    Read,
+    Balances,
     /// Add a new user
-    AddUser(AddUser)
+    AddUser(AddUser),
+    /// Add a new direct transfer
+    AddTransfer(AddTransfer),
+    /// Add a new expense
+    AddTransaction(AddTransaction)
 }
 
 #[derive(Args, Debug)]
@@ -32,6 +36,24 @@ struct AddUser {
     /// The name of the user to be added to the ledger
     #[clap(short, long, value_parser)]
     name: String
+}
+
+#[derive(Args, Debug)]
+struct AddTransfer {
+    #[clap(short, long, value_parser)]
+    from: String,
+
+    #[clap(short, long, value_parser)]
+    to: String,
+
+    #[clap(short, long, value_parser)]
+    amount: Amount
+}
+
+#[derive(Args, Debug)]
+struct AddTransaction {
+    #[clap(short, long, value_parser)]
+    from: Vec<String>
 }
 
 fn main() {
@@ -43,7 +65,7 @@ fn main() {
         expect("File is not valid JSON");
 
     match args.action {
-        Subcommands::Read => {
+        Subcommands::Balances => {
             for (u, b) in ledger.get_balances() {
                 println!("{}: {}", u, b);
             }
