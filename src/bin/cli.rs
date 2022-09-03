@@ -1,8 +1,8 @@
-use divider::{User, Ledger, transaction::{Amount, Benefit}};
+use divider::{User, Ledger,
+    backend::{LedgerStore, JsonStore},
+    transaction::{Amount, Benefit}};
 
 use std::path::PathBuf;
-use std::fs;
-
 use serde_json;
 use clap::{Args, Parser, Subcommand};
 
@@ -18,7 +18,6 @@ struct Cli {
    action: Subcommands,
 }
 
-// TODO: subcommands for `new`, `add`, `add-user`, `read`s
 #[derive(Debug, Subcommand)]
 enum Subcommands {
     /// Read and display balances
@@ -59,10 +58,8 @@ struct AddTransaction {
 fn main() {
     let args = Cli::parse();
 
-    let file_contents = fs::read_to_string(args.path).
-        expect("File could not be read");
-    let ledger: Ledger = serde_json::from_str(&file_contents).
-        expect("File is not valid JSON");
+    let store = JsonStore::new(&args.path);
+    let ledger = store.read();
 
     match args.action {
         Subcommands::Balances => {
@@ -72,4 +69,6 @@ fn main() {
         },
         _ => panic!("Not implemented")
     }
+
+    store.save(&ledger);
 }
