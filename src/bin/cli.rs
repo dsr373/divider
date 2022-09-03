@@ -33,7 +33,7 @@ enum Subcommands {
 #[derive(Args, Debug)]
 struct AddUser {
     /// The name of the user to be added to the ledger
-    #[clap(short, long, value_parser)]
+    #[clap(value_parser)]
     name: String
 }
 
@@ -59,7 +59,7 @@ fn main() {
     let args = Cli::parse();
 
     let store = JsonStore::new(&args.path);
-    let ledger = store.read();
+    let mut ledger = store.read();
 
     match args.action {
         Subcommands::Balances => {
@@ -67,6 +67,9 @@ fn main() {
                 println!("{}: {}", u, b);
             }
         },
+        Subcommands::AddUser(add_user) => {
+            ledger.add_user(&add_user.name);
+        }
         _ => panic!("Not implemented")
     }
 

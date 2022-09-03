@@ -52,6 +52,10 @@ impl Ledger {
             .find_map(|user| if user.name == name { Some(user) } else {None})
     }
 
+    pub fn add_user(&mut self, name: &str) {
+        self.balances.insert(User::new(name), 0.0);
+    }
+
     pub fn add_expense(&mut self, contributions: AmountPerUserRef, benefits: BenefitPerUserRef, description: &str) -> TransactionResult<()> {
         let transaction = Transaction::new(contributions, benefits, description);
         self.add_transaction(transaction)
