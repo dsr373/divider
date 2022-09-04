@@ -7,7 +7,7 @@ use crate::core::user::User;
 
 pub type Amount = f32;
 
-#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Benefit {
     Sum(Amount),
     Even
@@ -150,10 +150,8 @@ impl Transaction {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::User;
-    use crate::core::Transaction;
-    use crate::core::transaction::Benefit;
-
+    use crate::{User, Transaction, transaction::Benefit};
+    use colored;
     use rstest::{fixture, rstest};
 
     #[fixture]
@@ -167,6 +165,7 @@ mod tests {
 
     #[rstest]
     fn can_print(users: (User, User, User, User)) {
+        colored::control::set_override(false);
         let (bilbo, _, legolas, gimli) = users;
 
         let contrib = vec![(&bilbo, 32.0)];
@@ -179,7 +178,7 @@ mod tests {
         let transaction = Transaction::new(contrib, benefit, "");
         let repr = transaction.to_string();
 
-        assert_eq!(repr, "Contributions: Bilbo: 32; Beneficiaries: Legolas: Even; Gimli: 10; ");
+        assert_eq!(repr, "From: Bilbo: 32; To: Legolas: Even; Gimli: 10; ");
     }
 
     #[fixture]
