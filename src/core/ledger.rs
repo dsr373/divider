@@ -52,6 +52,10 @@ impl Ledger {
             .find_map(|user| if user.name == name { Some(user) } else {None})
     }
 
+    pub fn get_transactions(&self) -> &Vec<Transaction> {
+        return &self.transactions;
+    }
+
     pub fn add_user(&mut self, name: &str) {
         self.balances.insert(User::new(name), 0.0);
     }

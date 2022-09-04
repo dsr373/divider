@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
+use colored::Colorize;
 
 use crate::core::user::User;
 
@@ -54,12 +55,12 @@ pub struct Transaction {
 
 impl std::fmt::Display for Transaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Contributions: ")?;
+        write!(f, "{}: ", "From".bold())?;
         for (user, amount) in &self.contributions {
             write!(f, "{}: {}; ", user, amount)?;
         }
 
-        write!(f, "Beneficiaries: ")?;
+        write!(f, "{}: ", "To".bold())?;
         for (user, benefit) in &self.benefits {
             write!(f, "{}: {}; ", user, benefit)?;
         }
