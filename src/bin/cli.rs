@@ -1,6 +1,6 @@
 use divider::{User, Ledger,
     backend::{LedgerStore, JsonStore},
-    transaction::{Amount, BenefitPerUser, Benefit, AmountPerUser, ToBorrowedUsers, TransactionError}};
+    transaction::{Amount, BenefitPerUser, Benefit, AmountPerUser, ToBorrowedUsers}};
 
 use std::path::PathBuf;
 use colored::Colorize;
@@ -27,9 +27,9 @@ enum Subcommands {
     /// Add a new user
     AddUser(AddUser),
     /// Add a new direct transfer
-    AddTransfer(AddTransfer),
+    AddDirect(AddDirect),
     /// Add a new expense
-    AddTransaction(AddTransaction)
+    AddExpense(AddExpense)
 }
 
 fn print_balances(ledger: &Ledger) {
@@ -54,7 +54,7 @@ struct AddUser {
 }
 
 #[derive(Args, Debug)]
-struct AddTransfer {
+struct AddDirect {
     /// Name of user that paid
     #[clap(short='f', long, value_parser)]
     from: String,
@@ -70,8 +70,8 @@ struct AddTransfer {
     description: String
 }
 
-impl AddTransfer {
-    fn add_transfer(&self, ledger: &mut Ledger) {
+impl AddDirect {
+    fn add_direct(&self, ledger: &mut Ledger) {
         let user_from = ledger.get_user_by_name(&self.from)
             .expect(&format!("No such user {}", &self.from)).to_owned();
         let user_to = ledger.get_user_by_name(&self.to)
@@ -87,7 +87,7 @@ impl AddTransfer {
 }
 
 #[derive(Args, Debug)]
-struct AddTransaction {
+struct AddExpense {
     /// Pairs of: (name, amount) contributed to this expense
     #[clap(short, long, value_parser)]
     from: Vec<String>,
@@ -107,10 +107,10 @@ struct AddTransaction {
     description: String
 }
 
-impl AddTransaction {
-    pub fn add_transaction(&self, ledger: &mut Ledger) {
-        let contributions = AddTransaction::parse_contributors(&self.from);
-        let benefits = AddTransaction::parse_beneficiaries(&self.to);
+impl AddExpense {
+    pub fn add_expense(&self, ledger: &mut Ledger) {
+        let contributions = AddExpense::parse_contributors(&self.from);
+        let benefits = AddExpense::parse_beneficiaries(&self.to);
 
         let result = ledger.add_expense(
             (&contributions).to_borrowed_users(),
@@ -187,11 +187,11 @@ fn main() {
         Subcommands::AddUser(add_user) => {
             ledger.add_user(&add_user.name);
         },
-        Subcommands::AddTransfer(add_transfer) => {
-            add_transfer.add_transfer(&mut ledger);
+        Subcommands::AddDirect(add_direct) => {
+            add_direct.add_direct(&mut ledger);
         },
-        Subcommands::AddTransaction(add_transaction) => {
-            add_transaction.add_transaction(&mut ledger);
+        Subcommands::AddExpense(add_expense) => {
+            add_expense.add_expense(&mut ledger);
         }
         _ => todo!("{:?}", &args.action)
     }
@@ -203,14 +203,14 @@ fn main() {
 mod parser_tests {
     use divider::{User, transaction::Benefit};
     use rstest::rstest;
-    use crate::AddTransaction;
+    use crate::AddExpense;
 
     #[rstest]
     fn parse_contributions_correct() {
         let cmdline = "Bilbo 12 Legolas 20";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let parsed = AddTransaction::parse_contributors(&arguments);
+        let parsed = AddExpense::parse_contributors(&arguments);
 
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed[0], (User::new("Bilbo"), 12.0));
@@ -223,7 +223,7 @@ mod parser_tests {
         let cmdline = "Bilbo 12 Legolas";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_contributors(&arguments);
+        let _ = AddExpense::parse_contributors(&arguments);
     }
 
     #[rstest]
@@ -232,7 +232,7 @@ mod parser_tests {
         let cmdline = "Bilbo 12 Legolas abcdef";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_contributors(&arguments);
+        let _ = AddExpense::parse_contributors(&arguments);
     }
 
     #[rstest]
@@ -240,7 +240,7 @@ mod parser_tests {
         let cmdline = "Aragorn";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let beneficiaries = AddTransaction::parse_beneficiaries(&arguments);
+        let beneficiaries = AddExpense::parse_beneficiaries(&arguments);
 
         assert_eq!(beneficiaries.len(), 1);
         assert_eq!(beneficiaries[0], (User::new("Aragorn"), Benefit::Even));
@@ -251,7 +251,7 @@ mod parser_tests {
         let cmdline = "Bilbo Legolas";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let beneficiaries = AddTransaction::parse_beneficiaries(&arguments);
+        let beneficiaries = AddExpense::parse_beneficiaries(&arguments);
 
         assert_eq!(beneficiaries.len(), 2);
         assert_eq!(beneficiaries[0], (User::new("Bilbo"), Benefit::Even));
@@ -263,7 +263,7 @@ mod parser_tests {
         let cmdline = "Bilbo Legolas 24";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let beneficiaries = AddTransaction::parse_beneficiaries(&arguments);
+        let beneficiaries = AddExpense::parse_beneficiaries(&arguments);
 
         assert_eq!(beneficiaries.len(), 2);
         assert_eq!(beneficiaries[0], (User::new("Bilbo"), Benefit::Even));
@@ -276,7 +276,7 @@ mod parser_tests {
         let cmdline = "Bilbo 24 30 Legolas";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_beneficiaries(&arguments);
+        let _ = AddExpense::parse_beneficiaries(&arguments);
     }
 
     #[rstest]
@@ -285,6 +285,6 @@ mod parser_tests {
         let cmdline = "31 Bilbo Legolas";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_beneficiaries(&arguments);
+        let _ = AddExpense::parse_beneficiaries(&arguments);
     }
 }
