@@ -45,6 +45,22 @@ impl<'a, T: Copy> ToOwnedUsers for Vec<(&'a User, T)> {
     }
 }
 
+/// Trait which allows a user-owning type to be converted
+/// into an equivalent user-borrowing type with references
+/// to the original owner (just for use in functions which require refs)
+/// TODO: this is a code smell, all of this conversion business needs to refactored out
+pub trait ToBorrowedUsers {
+    type WithBorrowedUsers;
+    fn to_borrowed_users(&self) -> Self::WithBorrowedUsers;
+}
+
+impl <'a, T: Copy> ToBorrowedUsers for &'a Vec<(User, T)> {
+    type WithBorrowedUsers = Vec<(&'a User, T)>;
+    fn to_borrowed_users(&self) -> Self::WithBorrowedUsers {
+        self.iter().map(|pair| (&pair.0, pair.1)).collect()
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Transaction {
     contributions: AmountPerUser,
@@ -73,6 +89,17 @@ pub enum TransactionError {
     InsufficientBenefits{specified: Amount, spent: Amount},
     ExcessBenefits{specified: Amount, spent: Amount},
     UnrecognisedUser(User)
+}
+
+impl std::fmt::Display for TransactionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let msg: String = match self {
+            TransactionError::InsufficientBenefits { specified, spent } => format!("{} spent, but {} used", spent, specified),
+            TransactionError::ExcessBenefits { specified, spent } => format!("{} spent, but {} used", spent, specified),
+            TransactionError::UnrecognisedUser(user) => format!("No such user: {}", user.name)
+        };
+        write!(f, "Transaction error: {}", msg)
+    }
 }
 
 pub type TransactionResult<T> = Result<T, TransactionError>;

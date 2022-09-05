@@ -1,6 +1,6 @@
 use divider::{User, Ledger,
     backend::{LedgerStore, JsonStore},
-    transaction::{Amount, AmountPerUserRef, BenefitPerUser, Benefit, AmountPerUser}};
+    transaction::{Amount, BenefitPerUser, Benefit, AmountPerUser, ToBorrowedUsers, TransactionError}};
 
 use std::path::PathBuf;
 use colored::Colorize;
@@ -109,33 +109,33 @@ struct AddTransaction {
 
 impl AddTransaction {
     pub fn add_transaction(&self, ledger: &mut Ledger) {
-        let contributions = AddTransaction::parse_contributors(&self.from, &ledger);
-        let benefits = AddTransaction::parse_beneficiaries(&self.to, &ledger);
+        let contributions = AddTransaction::parse_contributors(&self.from);
+        let benefits = AddTransaction::parse_beneficiaries(&self.to);
 
-        // FIXME: must make these have refs, or a function which takes owned users
-        // could stop getting the user from the ledger when parsing -- would make it faster too.
-        // just create a new user when parsing and rely on the checking in add_expense
-        ledger.add_expense(contributions, benefits, &self.description);
+        let result = ledger.add_expense(
+            (&contributions).to_borrowed_users(),
+            (&benefits).to_borrowed_users(), &self.description);
+
+        if let Err(transaction_error) = result {
+            panic!("{}", transaction_error.to_string());
+        }
     }
 
-    fn parse_contributors(arguments: &Vec<String>, ledger: &Ledger) -> AmountPerUser {
+    fn parse_contributors(arguments: &Vec<String>) -> AmountPerUser {
         let mut contributions = AmountPerUser::new();
 
         for slice in arguments.chunks(2) {
             if slice.len() < 2 {
                 panic!("Contributions must be pairs of name and amount");
             }
-            let user = match ledger.get_user_by_name(&slice[0]) {
-                None => panic!("No such user: {}", &slice[0]),
-                Some(u) => u.to_owned()
-            };
+            let user = User::new(&slice[0]);
             let amount: Amount = slice[1].parse().expect("Must be a number");
             contributions.push((user, amount));
         }
         return contributions;
     }
 
-    fn parse_beneficiaries(arguments: &Vec<String>, ledger: &Ledger) -> BenefitPerUser {
+    fn parse_beneficiaries(arguments: &Vec<String>) -> BenefitPerUser {
         let mut beneficiaries = BenefitPerUser::new();
         let mut prev_user: Option<User> = None;
 
@@ -154,14 +154,10 @@ impl AddTransaction {
                 Err(_) => {
                     // this is not a number so it must be a user
                     // if we have a prev_user, its benefit is Even
-                    if let Some(user) = &prev_user {
-                        beneficiaries.push((user.to_owned(), Benefit::Even));
+                    if let Some(user) = prev_user {
+                        beneficiaries.push((user, Benefit::Even));
                     }
-                    let this_user = match ledger.get_user_by_name(val) {
-                        Some(u) => u.to_owned(),
-                        None => panic!("No such user: {}", val)
-                    };
-                    prev_user = Some(this_user);
+                    prev_user = Some(User::new(val));
                 }
             }
         }
@@ -193,6 +189,9 @@ fn main() {
         },
         Subcommands::AddTransfer(add_transfer) => {
             add_transfer.add_transfer(&mut ledger);
+        },
+        Subcommands::AddTransaction(add_transaction) => {
+            add_transaction.add_transaction(&mut ledger);
         }
         _ => todo!("{:?}", &args.action)
     }
@@ -202,21 +201,16 @@ fn main() {
 
 #[cfg(test)]
 mod parser_tests {
-    use divider::{Ledger, User, transaction::Benefit};
-    use rstest::{rstest, fixture};
+    use divider::{User, transaction::Benefit};
+    use rstest::rstest;
     use crate::AddTransaction;
 
-    #[fixture]
-    fn ledger() -> Ledger {
-        return Ledger::new(vec!["Frodo", "Bilbo", "Legolas", "Gimli"]);
-    }
-
     #[rstest]
-    fn parse_contributions_correct(ledger: Ledger) {
+    fn parse_contributions_correct() {
         let cmdline = "Bilbo 12 Legolas 20";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let parsed = AddTransaction::parse_contributors(&arguments, &ledger);
+        let parsed = AddTransaction::parse_contributors(&arguments);
 
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed[0], (User::new("Bilbo"), 12.0));
@@ -224,38 +218,40 @@ mod parser_tests {
     }
 
     #[rstest]
-    #[should_panic(expected = "No such user: Aragorn")]
-    fn parse_contributions_wrong_user(ledger: Ledger) {
-        let cmdline = "Bilbo 12 Aragorn 20";
-        let arguments = cmdline.split(' ')
-            .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_contributors(&arguments, &ledger);
-    }
-
-    #[rstest]
     #[should_panic(expected = "Contributions must be pairs of name and amount")]
-    fn parse_contributions_odd_arguments(ledger: Ledger) {
+    fn parse_contributions_odd_arguments() {
         let cmdline = "Bilbo 12 Legolas";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_contributors(&arguments, &ledger);
+        let _ = AddTransaction::parse_contributors(&arguments);
     }
 
     #[rstest]
     #[should_panic(expected = "Must be a number")]
-    fn parse_contributions_not_a_number(ledger: Ledger) {
+    fn parse_contributions_not_a_number() {
         let cmdline = "Bilbo 12 Legolas abcdef";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_contributors(&arguments, &ledger);
+        let _ = AddTransaction::parse_contributors(&arguments);
     }
 
     #[rstest]
-    fn parse_beneficiaries_all_even(ledger: Ledger) {
+    fn parse_beneficiaries_single() {
+        let cmdline = "Aragorn";
+        let arguments = cmdline.split(' ')
+            .map(|s| s.to_string()).collect::<Vec<String>>();
+        let beneficiaries = AddTransaction::parse_beneficiaries(&arguments);
+
+        assert_eq!(beneficiaries.len(), 1);
+        assert_eq!(beneficiaries[0], (User::new("Aragorn"), Benefit::Even));
+    }
+
+    #[rstest]
+    fn parse_beneficiaries_all_even() {
         let cmdline = "Bilbo Legolas";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let beneficiaries = AddTransaction::parse_beneficiaries(&arguments, &ledger);
+        let beneficiaries = AddTransaction::parse_beneficiaries(&arguments);
 
         assert_eq!(beneficiaries.len(), 2);
         assert_eq!(beneficiaries[0], (User::new("Bilbo"), Benefit::Even));
@@ -263,11 +259,11 @@ mod parser_tests {
     }
 
     #[rstest]
-    fn parse_beneficiaries_some_specific(ledger: Ledger) {
+    fn parse_beneficiaries_some_specific() {
         let cmdline = "Bilbo Legolas 24";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let beneficiaries = AddTransaction::parse_beneficiaries(&arguments, &ledger);
+        let beneficiaries = AddTransaction::parse_beneficiaries(&arguments);
 
         assert_eq!(beneficiaries.len(), 2);
         assert_eq!(beneficiaries[0], (User::new("Bilbo"), Benefit::Even));
@@ -276,28 +272,19 @@ mod parser_tests {
 
     #[rstest]
     #[should_panic(expected = "Expected a user before 30")]
-    fn parse_beneficiaries_two_numbers(ledger: Ledger) {
+    fn parse_beneficiaries_two_numbers() {
         let cmdline = "Bilbo 24 30 Legolas";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_beneficiaries(&arguments, &ledger);
+        let _ = AddTransaction::parse_beneficiaries(&arguments);
     }
 
     #[rstest]
     #[should_panic(expected = "Expected a user before 31")]
-    fn parse_beneficiaries_starts_with_number(ledger: Ledger) {
+    fn parse_beneficiaries_starts_with_number() {
         let cmdline = "31 Bilbo Legolas";
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_beneficiaries(&arguments, &ledger);
-    }
-
-    #[rstest]
-    #[should_panic(expected = "No such user: Aragorn")]
-    fn parse_beneficiaries_wrong_user(ledger: Ledger) {
-        let cmdline = "Bilbo 29 Aragorn Legolas";
-        let arguments = cmdline.split(' ')
-            .map(|s| s.to_string()).collect::<Vec<String>>();
-        let _ = AddTransaction::parse_beneficiaries(&arguments, &ledger);
+        let _ = AddTransaction::parse_beneficiaries(&arguments);
     }
 }
