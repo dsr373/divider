@@ -66,6 +66,7 @@ struct AddDirect {
     #[clap(short='a', long, value_parser)]
     amount: Amount,
 
+    /// Describe the purpose of the transfer
     #[clap(short='d', long, value_parser, default_value_t = String::from("Transfer"))]
     description: String
 }
@@ -88,8 +89,9 @@ impl AddDirect {
 
 #[derive(Args, Debug)]
 struct AddExpense {
-    /// Pairs of: (name, amount) contributed to this expense
-    #[clap(short, long, value_parser)]
+    /// Pairs of: (name, amount) contributed to this expense. space separated.
+    /// Example: `Donald 5 Will 29`
+    #[clap(short, long, value_parser, required=true, min_values=1, multiple_occurrences=false)]
     from: Vec<String>,
 
     /// Names of beneficiaries of the expense. Specifying
@@ -97,13 +99,13 @@ struct AddExpense {
     /// benefit will be assumed.
     ///
     /// Examples:
-    /// `Ben George Mike` -> split evenly between all three
-    ///
-    /// `Ben 14 George Mike` -> Ben spent 14 and the rest is split evenly between George and Mike
-    #[clap(short, long, value_parser)]
+    /// `Ben George Mike` -> split evenly between all three.
+    /// `Ben 14 George Mike` -> Ben spent 14 and the rest is split evenly between George and Mike.
+    #[clap(short, long, value_parser, required=true, min_values=1, multiple_occurrences=false)]
     to: Vec<String>,
 
-    #[clap(short, long, value_parser)]
+    /// Describe the purpose of the expense
+    #[clap(short, long, value_parser, default_value_t = String::from(""))]
     description: String
 }
 
