@@ -1,11 +1,13 @@
 use std::collections::HashMap;
+use std::borrow::{Borrow, ToOwned};
 
 use serde::{Serialize, Deserialize};
 use colored::Colorize;
 
-use crate::core::user::User;
+use crate::core::user::{User, UserName};
 
 pub type Amount = f32;
+pub type UserAmountMap = HashMap<UserName, Amount>;
 
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Benefit {
@@ -23,48 +25,31 @@ impl std::fmt::Display for Benefit {
     }
 }
 
-pub type AmountPerUser = Vec<(User, Amount)>;
-pub type AmountPerUserRef<'a> = Vec<(&'a User, Amount)>;
-pub type BenefitPerUser = Vec<(User, Benefit)>;
-pub type BenefitPerUserRef<'a> = Vec<(&'a User, Benefit)>;
+pub type AmountPerUser<T: Borrow<str>> = Vec<(T, Amount)>;
+pub type BenefitPerUser<T: Borrow<str>> = Vec<(T, Benefit)>;
 
-/// Trait turning a type with user borrows (e.g. `&'a User`)
-/// into an equivalent type with owned users. It's helpful
-/// to avoid complex reference structures. Maybe not the
-/// best solution, potentially shared ownership of users will
-/// be required in the future.
+/// Trait turning a type with user borrows (e.g. `&'a User` or ids as &str)
+/// into an equivalent type with owned users or ids (as String).
+/// Maybe not the best solution, potentially shared ownership of users
+/// will be required in the future.
 trait ToOwnedUsers {
     type WithOwnedUsers;
     fn to_owned_users(&self) -> Self::WithOwnedUsers;
 }
 
-impl<'a, T: Copy> ToOwnedUsers for Vec<(&'a User, T)> {
-    type WithOwnedUsers = Vec<(User, T)>;
+impl<T: Copy> ToOwnedUsers for Vec<(&str, T)> {
+    type WithOwnedUsers = Vec<(UserName, T)>;
+
     fn to_owned_users(&self) -> Self::WithOwnedUsers {
         self.iter().map(|pair| (pair.0.to_owned(), pair.1)).collect()
     }
 }
 
-/// Trait which allows a user-owning type to be converted
-/// into an equivalent user-borrowing type with references
-/// to the original owner (just for use in functions which require refs)
-/// TODO: this is a code smell, all of this conversion business needs to refactored out
-pub trait ToBorrowedUsers {
-    type WithBorrowedUsers;
-    fn to_borrowed_users(&self) -> Self::WithBorrowedUsers;
-}
-
-impl <'a, T: Copy> ToBorrowedUsers for &'a Vec<(User, T)> {
-    type WithBorrowedUsers = Vec<(&'a User, T)>;
-    fn to_borrowed_users(&self) -> Self::WithBorrowedUsers {
-        self.iter().map(|pair| (&pair.0, pair.1)).collect()
-    }
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct Transaction {
-    contributions: AmountPerUser,
-    benefits: BenefitPerUser,
+    contributions: AmountPerUser<UserName>,
+    benefits: BenefitPerUser<UserName>,
     pub is_direct: bool,
     pub description: String
 }
@@ -94,9 +79,15 @@ pub enum TransactionError {
 impl std::fmt::Display for TransactionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let msg: String = match self {
-            TransactionError::InsufficientBenefits { specified, spent } => format!("{} spent, but {} used", spent, specified),
-            TransactionError::ExcessBenefits { specified, spent } => format!("{} spent, but {} used", spent, specified),
-            TransactionError::UnrecognisedUser(user) => format!("No such user: {}", user.name)
+            TransactionError::InsufficientBenefits { specified, spent } => {
+                format!("{} spent, but {} used", spent, specified)
+            },
+            TransactionError::ExcessBenefits { specified, spent } => {
+                format!("{} spent, but {} used", spent, specified)
+            },
+            TransactionError::UnrecognisedUser(user) => {
+                format!("No such user: {}", user.name)
+            }
         };
         write!(f, "Transaction error: {}", msg)
     }
@@ -105,19 +96,11 @@ impl std::fmt::Display for TransactionError {
 pub type TransactionResult<T> = Result<T, TransactionError>;
 
 impl Transaction {
-    pub fn new(contributions: AmountPerUserRef, benefits: BenefitPerUserRef, description: &str) -> Transaction {
+    pub fn new(contributions: AmountPerUser<&str>, benefits: BenefitPerUser<&str>, description: &str, direct: bool) -> Transaction {
         Transaction {
             contributions: contributions.to_owned_users(),
             benefits: benefits.to_owned_users(),
-            is_direct: false,
-            description: description.to_owned() }
-    }
-
-    pub fn new_direct(contributions: AmountPerUserRef, benefits: BenefitPerUserRef, description: &str) -> Transaction {
-        Transaction {
-            contributions: contributions.to_owned_users(),
-            benefits: benefits.to_owned_users(),
-            is_direct: true,
+            is_direct: direct,
             description: description.to_owned() }
     }
 
@@ -142,8 +125,8 @@ impl Transaction {
             });
     }
 
-    pub fn balance_updates(&self) -> TransactionResult<HashMap<User, Amount>> {
-        let mut balance_delta: HashMap<User, Amount> = HashMap::new();
+    pub fn balance_updates(&self) -> TransactionResult<UserAmountMap> {
+        let mut balance_delta: UserAmountMap = HashMap::new();
 
         let spending = self.total_spending();
         let specified_benefits = self.specified_benefits();
@@ -153,7 +136,7 @@ impl Transaction {
 
         let num_evens = self.num_even_benefits();
         let total_amount_evens = spending - specified_benefits;
-        if total_amount_evens > 0f32 && num_evens == 0 {
+        if total_amount_evens > 0.0 && num_evens == 0 {
             return Err(TransactionError::InsufficientBenefits{specified: specified_benefits, spent: spending})
         }
 
@@ -181,48 +164,37 @@ mod tests {
     use colored;
     use rstest::{fixture, rstest};
 
-    #[fixture]
-    fn users() -> (User, User, User, User) {
-        let bilbo = User::new("Bilbo");
-        let frodo = User::new("Frodo");
-        let legolas = User::new("Legolas");
-        let gimli = User::new("Gimli");
-        return (bilbo, frodo, legolas, gimli);
-    }
-
     #[rstest]
-    fn can_print(users: (User, User, User, User)) {
+    fn can_print() {
         colored::control::set_override(false);
-        let (bilbo, _, legolas, gimli) = users;
 
-        let contrib = vec![(&bilbo, 32.0)];
+        let contrib = vec![("Bilbo", 32.0)];
 
         let benefit = vec![
-            (&legolas, Benefit::Even),
-            (&gimli, Benefit::Sum(10.0))
+            ("Legolas", Benefit::Even),
+            ("Gimli", Benefit::Sum(10.0))
         ];
 
-        let transaction = Transaction::new(contrib, benefit, "");
+        let transaction = Transaction::new(contrib, benefit, "", false);
         let repr = transaction.to_string();
 
         assert_eq!(repr, "From: Bilbo: 32; To: Legolas: Even; Gimli: 10; ");
     }
 
     #[fixture]
-    fn transaction(users: (User, User, User, User)) -> Transaction {
-        let (bilbo, frodo, legolas, gimli) = users;
+    fn transaction() -> Transaction {
         let contrib = vec![
-            (&bilbo, 32.0),
-            (&frodo, 12.0)
+            ("Bilbo", 32.0),
+            ("Frodo", 12.0)
         ];
 
         let benefit = vec![
-            (&legolas, Benefit::Even),
-            (&frodo, Benefit::Even),
-            (&gimli, Benefit::Sum(10.0))
+            ("Legolas", Benefit::Even),
+            ("Frodo", Benefit::Even),
+            ("Gimli", Benefit::Sum(10.0))
         ];
 
-        return Transaction::new(contrib, benefit, "");
+        return Transaction::new(contrib, benefit, "", false);
     }
 
     #[rstest]
@@ -231,8 +203,7 @@ mod tests {
     }
 
     #[rstest]
-    fn balance_distribution(users: (User, User, User, User), transaction: Transaction) {
-        let (bilbo, frodo, legolas, gimli) = users;
+    fn balance_distribution(transaction: Transaction) {
         let balance_delta = transaction.balance_updates().unwrap();
 
         assert_eq!(balance_delta.keys().len(), 4);
@@ -241,9 +212,9 @@ mod tests {
         assert_eq!(transaction.total_spending(), 44.0);
         assert_eq!(transaction.specified_benefits(), 10.0);
 
-        assert_eq!(*balance_delta.get(&bilbo).unwrap(), 32.0);
-        assert_eq!(*balance_delta.get(&legolas).unwrap(), -17.0);
-        assert_eq!(*balance_delta.get(&frodo).unwrap(), -5.0);
-        assert_eq!(*balance_delta.get(&gimli).unwrap(), -10.0);
+        assert_eq!(*balance_delta.get("Bilbo").unwrap(), 32.0);
+        assert_eq!(*balance_delta.get("Legolas").unwrap(), -17.0);
+        assert_eq!(*balance_delta.get("Frodo").unwrap(), -5.0);
+        assert_eq!(*balance_delta.get("Gimli").unwrap(), -10.0);
     }
 }

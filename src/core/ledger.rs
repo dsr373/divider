@@ -3,13 +3,10 @@ use std::collections::{HashMap, HashSet};
 use crate::core::user::User;
 use crate::core::transaction::{
     Transaction, TransactionResult, TransactionError,
-    AmountPerUserRef, BenefitPerUserRef,
-    Benefit, Amount};
+    Benefit, Amount, UserAmountMap};
 
 use serde::{Serialize, Deserialize};
 use serde_with::serde_as;
-
-type UserAmountMap = HashMap<User, Amount>;
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]
@@ -61,15 +58,16 @@ impl Ledger {
     }
 
     pub fn add_expense(&mut self, contributions: AmountPerUserRef, benefits: BenefitPerUserRef, description: &str) -> TransactionResult<()> {
-        let transaction = Transaction::new(contributions, benefits, description);
+        let transaction = Transaction::new(contributions, benefits, description, false);
         self.add_transaction(transaction)
     }
 
-    pub fn add_transfer(&mut self, from: &User, to: &User, amount: Amount, description: &str) -> TransactionResult<()> {
-        let transaction = Transaction::new_direct(
+    pub fn add_transfer(&mut self, from: &str, to: &str, amount: Amount, description: &str) -> TransactionResult<()> {
+        let transaction = Transaction::new(
             vec![(from, amount)],
             vec![(to, Benefit::Sum(amount))],
-            description
+            description,
+            true
         );
         self.add_transaction(transaction)
     }

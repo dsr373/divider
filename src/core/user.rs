@@ -1,36 +1,16 @@
 use std::fmt;
 use serde::{Serialize, Deserialize};
-// use std::collections::HashSet;
-// use std::sync::RwLock;
 
-// use rand::Rng;
-// use rand::prelude::ThreadRng;
+pub type UserName = String;
 
 #[derive(Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
 pub struct User {
-    // pub id: usize,
-    pub name: String
+    pub name: UserName
 }
 
-// static mut allUserIds: RwLock<HashSet<usize>> = RwLock::new(HashSet::new());
-
 impl User {
-
-    // fn new_id() -> usize {
-    //     let mut rng = rand::thread_rng();
-    //     let mut id: usize = rng.gen::<usize>();
-    //     while {
-    //         let all_ids = allUserIds.read().unwrap();
-    //         all_ids.contains(&id)
-    //     } {
-    //         id = rng.gen::<usize>();
-    //     }
-    //     allUserIds.write().unwrap().insert(id);
-    //     return id;
-    // }
-
     pub fn new(name: &str) -> User {
-        User { name: name.to_string() }
+        User { name: name.to_owned() }
     }
 }
 
