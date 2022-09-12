@@ -32,36 +32,40 @@ impl LedgerStore for JsonStore {
 
 #[cfg(test)]
 mod tests {
+    use crate::UserName;
     use crate::core::{User, Transaction, Ledger};
     use crate::core::transaction::Benefit;
+    use crate::transaction::{AmountPerUser, BenefitPerUser};
 
     use rstest::{fixture, rstest};
     use serde_json::json;
 
+    type UserNames4 = (UserName, UserName, UserName, UserName);
+
     #[fixture]
-    fn users() -> (User, User, User, User) {
-        let bilbo = User::new("Bilbo");
-        let frodo = User::new("Frodo");
-        let legolas = User::new("Legolas");
-        let gimli = User::new("Gimli");
+    fn users() -> UserNames4 {
+        let bilbo = String::from("Bilbo");
+        let frodo = String::from("Frodo");
+        let legolas = String::from("Legolas");
+        let gimli = String::from("Gimli");
         return (bilbo, frodo, legolas, gimli);
     }
 
     #[fixture]
-    fn transaction(users: (User, User, User, User)) -> Transaction {
+    fn transaction(users: UserNames4) -> Transaction {
         let (bilbo, frodo, legolas, gimli) = users;
-        let contrib = vec![
+        let contrib: AmountPerUser<&str> = vec![
             (&bilbo, 32.0),
             (&frodo, 12.0)
         ];
 
-        let benefit = vec![
+        let benefit: BenefitPerUser<&str> = vec![
             (&legolas, Benefit::Even),
             (&frodo, Benefit::Even),
             (&gimli, Benefit::Sum(10.0))
         ];
 
-        return Transaction::new(contrib, benefit, "");
+        return Transaction::new(contrib, benefit, "", false);
     }
 
     #[fixture]

@@ -4,9 +4,8 @@ use std::borrow::{Borrow, ToOwned};
 use serde::{Serialize, Deserialize};
 use colored::Colorize;
 
-use crate::core::user::{User, UserName};
+use crate::core::user::{UserName, Amount};
 
-pub type Amount = f32;
 pub type UserAmountMap = HashMap<UserName, Amount>;
 
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
@@ -25,8 +24,8 @@ impl std::fmt::Display for Benefit {
     }
 }
 
-pub type AmountPerUser<T: Borrow<str>> = Vec<(T, Amount)>;
-pub type BenefitPerUser<T: Borrow<str>> = Vec<(T, Benefit)>;
+pub type AmountPerUser<T> = Vec<(T, Amount)>;
+pub type BenefitPerUser<T> = Vec<(T, Benefit)>;
 
 /// Trait turning a type with user borrows (e.g. `&'a User` or ids as &str)
 /// into an equivalent type with owned users or ids (as String).
@@ -73,7 +72,7 @@ impl std::fmt::Display for Transaction {
 pub enum TransactionError {
     InsufficientBenefits{specified: Amount, spent: Amount},
     ExcessBenefits{specified: Amount, spent: Amount},
-    UnrecognisedUser(User)
+    UnrecognisedUser(UserName)
 }
 
 impl std::fmt::Display for TransactionError {
@@ -85,8 +84,8 @@ impl std::fmt::Display for TransactionError {
             TransactionError::ExcessBenefits { specified, spent } => {
                 format!("{} spent, but {} used", spent, specified)
             },
-            TransactionError::UnrecognisedUser(user) => {
-                format!("No such user: {}", user.name)
+            TransactionError::UnrecognisedUser(username) => {
+                format!("No such user: {}", username)
             }
         };
         write!(f, "Transaction error: {}", msg)
@@ -160,7 +159,7 @@ impl Transaction {
 
 #[cfg(test)]
 mod tests {
-    use crate::{User, Transaction, transaction::Benefit};
+    use crate::{Transaction, transaction::Benefit};
     use colored;
     use rstest::{fixture, rstest};
 

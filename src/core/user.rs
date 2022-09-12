@@ -2,8 +2,10 @@ use std::fmt;
 use serde::{Serialize, Deserialize};
 
 pub type UserName = String;
+pub type Amount = f32;
 
-#[derive(Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
+
+#[derive(Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct User {
     pub name: UserName
 }

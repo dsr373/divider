@@ -1,6 +1,6 @@
-use divider::{User, Ledger,
+use divider::{User, Ledger, Amount,
     backend::{LedgerStore, JsonStore},
-    transaction::{Amount, BenefitPerUser, Benefit, AmountPerUser, ToBorrowedUsers}};
+    transaction::{BenefitPerUser, Benefit, AmountPerUser}, UserName};
 
 use std::path::PathBuf;
 use colored::Colorize;
@@ -73,12 +73,8 @@ struct AddDirect {
 
 impl AddDirect {
     fn add_direct(&self, ledger: &mut Ledger) {
-        let user_from = ledger.get_user_by_name(&self.from)
-            .expect(&format!("No such user {}", &self.from)).to_owned();
-        let user_to = ledger.get_user_by_name(&self.to)
-            .expect(&format!("No such user {}", &self.to)).to_owned();
         let result = ledger.add_transfer(
-            &user_from, &user_to, self.amount, &self.description);
+            &self.from, &self.to, self.amount, &self.description);
 
         match result {
             Err(err) => panic!("Transaction error: {:?}", &err),
@@ -111,44 +107,43 @@ struct AddExpense {
 
 impl AddExpense {
     pub fn add_expense(&self, ledger: &mut Ledger) {
-        let contributions = AddExpense::parse_contributors(&self.from);
-        let benefits = AddExpense::parse_beneficiaries(&self.to);
+        let contributions: AmountPerUser<&str> = AddExpense::parse_contributors(&self.from);
+        let benefits: BenefitPerUser<&str> = AddExpense::parse_beneficiaries(&self.to);
 
         let result = ledger.add_expense(
-            (&contributions).to_borrowed_users(),
-            (&benefits).to_borrowed_users(), &self.description);
+            contributions, benefits, &self.description);
 
         if let Err(transaction_error) = result {
             panic!("{}", transaction_error.to_string());
         }
     }
 
-    fn parse_contributors(arguments: &Vec<String>) -> AmountPerUser {
-        let mut contributions = AmountPerUser::new();
+    fn parse_contributors(arguments: &Vec<String>) -> AmountPerUser<&str> {
+        let mut contributions: AmountPerUser<&str> = AmountPerUser::new();
 
         for slice in arguments.chunks(2) {
             if slice.len() < 2 {
                 panic!("Contributions must be pairs of name and amount");
             }
-            let user = User::new(&slice[0]);
+            let user_name = &slice[0];
             let amount: Amount = slice[1].parse().expect("Must be a number");
-            contributions.push((user, amount));
+            contributions.push((user_name, amount));
         }
         return contributions;
     }
 
-    fn parse_beneficiaries(arguments: &Vec<String>) -> BenefitPerUser {
-        let mut beneficiaries = BenefitPerUser::new();
-        let mut prev_user: Option<User> = None;
+    fn parse_beneficiaries(arguments: &Vec<String>) -> BenefitPerUser<&str> {
+        let mut beneficiaries: BenefitPerUser<&str> = BenefitPerUser::new();
+        let mut prev_user: Option<&str> = None;
 
         for val in arguments {
             match val.parse::<Amount>() {
                 Ok(amount) => {
                     // this is the amount that the previous user benefitted
-                    match &prev_user {
+                    match prev_user {
                         None => panic!("Expected a user before {}", amount),
                         Some(user) => {
-                            beneficiaries.push((user.to_owned(), Benefit::Sum(amount)));
+                            beneficiaries.push((user, Benefit::Sum(amount)));
                             prev_user = None;
                         }
                     }
@@ -159,7 +154,7 @@ impl AddExpense {
                     if let Some(user) = prev_user {
                         beneficiaries.push((user, Benefit::Even));
                     }
-                    prev_user = Some(User::new(val));
+                    prev_user = Some(val);
                 }
             }
         }
@@ -215,8 +210,8 @@ mod parser_tests {
         let parsed = AddExpense::parse_contributors(&arguments);
 
         assert_eq!(parsed.len(), 2);
-        assert_eq!(parsed[0], (User::new("Bilbo"), 12.0));
-        assert_eq!(parsed[1], (User::new("Legolas"), 20.0));
+        assert_eq!(parsed[0], ("Bilbo", 12.0));
+        assert_eq!(parsed[1], ("Legolas", 20.0));
     }
 
     #[rstest]
@@ -245,7 +240,7 @@ mod parser_tests {
         let beneficiaries = AddExpense::parse_beneficiaries(&arguments);
 
         assert_eq!(beneficiaries.len(), 1);
-        assert_eq!(beneficiaries[0], (User::new("Aragorn"), Benefit::Even));
+        assert_eq!(beneficiaries[0], ("Aragorn", Benefit::Even));
     }
 
     #[rstest]
@@ -256,8 +251,8 @@ mod parser_tests {
         let beneficiaries = AddExpense::parse_beneficiaries(&arguments);
 
         assert_eq!(beneficiaries.len(), 2);
-        assert_eq!(beneficiaries[0], (User::new("Bilbo"), Benefit::Even));
-        assert_eq!(beneficiaries[1], (User::new("Legolas"), Benefit::Even));
+        assert_eq!(beneficiaries[0], ("Bilbo", Benefit::Even));
+        assert_eq!(beneficiaries[1], ("Legolas", Benefit::Even));
     }
 
     #[rstest]
@@ -268,8 +263,8 @@ mod parser_tests {
         let beneficiaries = AddExpense::parse_beneficiaries(&arguments);
 
         assert_eq!(beneficiaries.len(), 2);
-        assert_eq!(beneficiaries[0], (User::new("Bilbo"), Benefit::Even));
-        assert_eq!(beneficiaries[1], (User::new("Legolas"), Benefit::Sum(24.0)));
+        assert_eq!(beneficiaries[0], ("Bilbo", Benefit::Even));
+        assert_eq!(beneficiaries[1], ("Legolas", Benefit::Sum(24.0)));
     }
 
     #[rstest]
