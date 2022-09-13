@@ -216,10 +216,10 @@ mod tests {
 
     #[rstest]
     fn consistency_check(mut ledger: Ledger, user_names: UserNames4) {
-        const interval: usize = Ledger::CONSISTENCY_CHECK_INTERVAL;
+        const INTERVAL: usize = Ledger::CONSISTENCY_CHECK_INTERVAL;
         let (bilbo, frodo, legolas, gimli) = &user_names;
 
-        let repeated_transactions = (interval - 1)/2;
+        let repeated_transactions = (INTERVAL - 1)/2;
 
         for _ in 0..repeated_transactions {
             add_transaction_bilbo(&mut ledger, &user_names);

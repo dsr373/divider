@@ -1,6 +1,6 @@
-use divider::{User, Ledger, Amount,
+use divider::{Ledger, Amount,
     backend::{LedgerStore, JsonStore},
-    transaction::{BenefitPerUser, Benefit, AmountPerUser}, UserName};
+    transaction::{BenefitPerUser, Benefit, AmountPerUser}};
 
 use std::path::PathBuf;
 use colored::Colorize;

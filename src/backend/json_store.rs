@@ -33,7 +33,7 @@ impl LedgerStore for JsonStore {
 #[cfg(test)]
 mod tests {
     use crate::UserName;
-    use crate::core::{User, Transaction, Ledger};
+    use crate::core::{Transaction, Ledger};
     use crate::core::transaction::Benefit;
     use crate::transaction::{AmountPerUser, BenefitPerUser};
 
@@ -72,13 +72,13 @@ mod tests {
     fn transaction_json() -> serde_json::Value {
         json!({
             "contributions": [
-                [{"name": "Bilbo"}, 32.0],
-                [{"name": "Frodo"}, 12.0]
+                ["Bilbo", 32.0],
+                ["Frodo", 12.0]
             ],
             "benefits": [
-                [{"name": "Legolas"}, "Even"],
-                [{"name": "Frodo"}, "Even"],
-                [{"name": "Gimli"}, {"Sum": 10.0}],
+                ["Legolas", "Even"],
+                ["Frodo", "Even"],
+                ["Gimli", {"Sum": 10.0}],
             ],
             "is_direct": false,
             "description": ""
@@ -88,12 +88,18 @@ mod tests {
     #[fixture]
     fn ledger_json(transaction_json: serde_json::Value) -> serde_json::Value {
         json!({
-            "balances": [
-                [{"name": "Bilbo"}, 32.0],
-                [{"name": "Frodo"}, -5.0],
-                [{"name": "Legolas"}, -17.0],
-                [{"name": "Gimli"}, -10.0],
-            ],
+            "balances": {
+                "Bilbo": 32.0,
+                "Frodo": -5.0,
+                "Legolas": -17.0,
+                "Gimli": -10.0,
+            },
+            "users": {
+                "Bilbo": {"name": "Bilbo"},
+                "Frodo": {"name": "Frodo"},
+                "Legolas": {"name": "Legolas"},
+                "Gimli": {"name": "Gimli"},
+            },
             "total_spend": 44.0,
             "transactions": [transaction_json]
         })
@@ -126,15 +132,24 @@ mod tests {
         let serialised = serde_json::to_value(&ledger).unwrap();
         assert_eq!(serialised["transactions"], ledger_json["transactions"]);
         assert_eq!(serialised["total_spend"], ledger_json["total_spend"]);
-        for v in ledger_json["balances"].as_array().unwrap() {
-            assert!(serialised["balances"].as_array().unwrap().contains(&v));
+        for v in ledger_json["balances"].as_object().unwrap() {
+            assert!(serialised["balances"].as_object().unwrap().contains_key(v.0));
         }
     }
 
     #[rstest]
     fn ledger_deserialize(ledger: Ledger, ledger_json: serde_json::Value) {
         let deserialised = serde_json::from_value::<Ledger>(ledger_json).unwrap();
-        assert_eq!(deserialised.get_users(), ledger.get_users());
-        assert_eq!(deserialised.get_balances(), ledger.get_balances());
+
+        let users_ledger = ledger.get_users();
+        for user in deserialised.get_users() {
+            assert!(users_ledger.contains(&user));
+        }
+
+        let balances_ledger = ledger.get_balances();
+        for (name, balance) in deserialised.get_balances() {
+            assert!(balances_ledger.contains_key(&name));
+            assert_eq!(balances_ledger.get(&name).unwrap(), &balance);
+        }
     }
 }
