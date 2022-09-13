@@ -1,1 +1,30 @@
-{"balances":[[{"name":"Legolas"},0.0],[{"name":"Gimli"},-10.0],[{"name":"Bilbo"},15.0],[{"name":"Frodo"},-5.0]],"transactions":[{"contributions":[[{"name":"Bilbo"},32.0],[{"name":"Frodo"},12.0]],"benefits":[[{"name":"Legolas"},"Even"],[{"name":"Frodo"},"Even"],[{"name":"Gimli"},{"Sum":10.0}]],"is_direct":false,"description":""},{"contributions":[[{"name":"Legolas"},17.0]],"benefits":[[{"name":"Bilbo"},{"Sum":17.0}]],"is_direct":true,"description":"debt"}],"total_spend":44.0}
+{
+    "balances": {
+        "Bilbo": 32.0,
+        "Frodo": -5.0,
+        "Legolas": -17.0,
+        "Gimli": -10.0
+    },
+    "users": {
+        "Bilbo": {"name": "Bilbo"},
+        "Frodo": {"name": "Frodo"},
+        "Legolas": {"name": "Legolas"},
+        "Gimli": {"name": "Gimli"}
+    },
+    "total_spend": 44.0,
+    "transactions": [
+        {
+            "contributions": [
+                ["Bilbo", 32.0],
+                ["Frodo", 12.0]
+            ],
+            "benefits": [
+                ["Legolas", "Even"],
+                ["Frodo", "Even"],
+                ["Gimli", {"Sum": 10.0}]
+            ],
+            "is_direct": false,
+            "description": ""
+        }
+    ]
+}
