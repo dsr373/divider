@@ -22,13 +22,13 @@ pub struct Ledger {
 impl Ledger {
     const CONSISTENCY_CHECK_INTERVAL: usize = 100;
 
-    pub fn new(user_names: Vec<&str>) -> Ledger {
+    pub fn new<T: AsRef<str>>(user_names: Vec<T>) -> Ledger {
         let users = user_names.iter()
-            .map(|user_name| (String::from(*user_name), User::new(user_name)))
+            .map(|user_name| (String::from(user_name.as_ref()), User::new(user_name.as_ref())))
             .collect();
 
         let balances = user_names.iter()
-            .map(|user_name| (String::from(*user_name), 0.0 as Amount))
+            .map(|user_name| (String::from(user_name.as_ref()), 0.0 as Amount))
             .collect();
 
         return Ledger { balances, users, transactions: Vec::new(), total_spend: 0.0 as Amount };

@@ -20,6 +20,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Subcommands {
+    /// Create new ledger
+    New(NewLedger),
     /// Read and display balances
     Balances,
     /// List all transactions
@@ -30,6 +32,13 @@ enum Subcommands {
     AddDirect(AddDirect),
     /// Add a new expense
     AddExpense(AddExpense)
+}
+
+#[derive(Args, Debug)]
+struct NewLedger {
+    /// Names of the users on the ledger
+    #[clap(value_parser, required=true, min_values=1)]
+    names: Vec<String>
 }
 
 fn print_balances(ledger: &Ledger) {
@@ -170,26 +179,34 @@ fn main() {
     let args = Cli::parse();
 
     let store = JsonStore::new(&args.path);
-    let mut ledger = store.read();
 
     match args.action {
+        Subcommands::New(new_ledger) => {
+            let ledger = Ledger::new(new_ledger.names);
+            store.save(&ledger);
+        }
         Subcommands::Balances => {
+            let ledger = store.read();
             print_balances(&ledger);
         },
         Subcommands::List => {
+            let ledger = store.read();
             for t in ledger.get_transactions() {
                 println!("{}", t);
             }
         }
         Subcommands::AddUser(add_user) => {
+            let mut ledger = store.read();
             ledger.add_user(&add_user.name);
             store.save(&ledger);
         },
         Subcommands::AddDirect(add_direct) => {
+            let mut ledger = store.read();
             add_direct.add_direct(&mut ledger);
             store.save(&ledger);
         },
         Subcommands::AddExpense(add_expense) => {
+            let mut ledger = store.read();
             add_expense.add_expense(&mut ledger);
             store.save(&ledger);
         }
