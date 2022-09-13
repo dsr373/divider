@@ -198,7 +198,7 @@ fn main() {
 
 #[cfg(test)]
 mod parser_tests {
-    use divider::{User, transaction::Benefit};
+    use divider::transaction::Benefit;
     use rstest::rstest;
     use crate::AddExpense;
 
