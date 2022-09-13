@@ -41,7 +41,7 @@ fn print_balances(ledger: &Ledger) {
         } else {
             colored::ColoredString::normal
         };
-        let fmt_balance = color(format!("{}", balance).white());
+        let fmt_balance = color(format!("{:.2}", balance).white());
         println!("{}: {}", user, fmt_balance);
     }
 }
@@ -183,17 +183,18 @@ fn main() {
         }
         Subcommands::AddUser(add_user) => {
             ledger.add_user(&add_user.name);
+            store.save(&ledger);
         },
         Subcommands::AddDirect(add_direct) => {
             add_direct.add_direct(&mut ledger);
+            store.save(&ledger);
         },
         Subcommands::AddExpense(add_expense) => {
             add_expense.add_expense(&mut ledger);
+            store.save(&ledger);
         }
         _ => todo!("{:?}", &args.action)
     }
-
-    store.save(&ledger);
 }
 
 #[cfg(test)]
