@@ -1,8 +1,12 @@
 use divider::{Ledger, Amount,
     backend::{LedgerStore, JsonStore},
-    transaction::{BenefitPerUser, Benefit, AmountPerUser}};
+    transaction::{BenefitPerUser, Benefit, AmountPerUser, TransactionResult}};
 
 use std::path::PathBuf;
+use std::error;
+use std::result;
+use std::process::ExitCode;
+
 use colored::Colorize;
 use clap::{Args, Parser, Subcommand};
 
@@ -81,14 +85,8 @@ struct AddDirect {
 }
 
 impl AddDirect {
-    fn add_direct(&self, ledger: &mut Ledger) {
-        let result = ledger.add_transfer(
-            &self.from, &self.to, self.amount, &self.description);
-
-        match result {
-            Err(err) => panic!("Transaction error: {:?}", &err),
-            Ok(_) => ()
-        };
+    fn add_direct(&self, ledger: &mut Ledger) -> TransactionResult<()> {
+        ledger.add_transfer(&self.from, &self.to, self.amount, &self.description)
     }
 }
 
@@ -115,16 +113,11 @@ struct AddExpense {
 }
 
 impl AddExpense {
-    pub fn add_expense(&self, ledger: &mut Ledger) {
+    pub fn add_expense(&self, ledger: &mut Ledger) -> TransactionResult<()> {
         let contributions: AmountPerUser<&str> = AddExpense::parse_contributors(&self.from);
         let benefits: BenefitPerUser<&str> = AddExpense::parse_beneficiaries(&self.to);
 
-        let result = ledger.add_expense(
-            contributions, benefits, &self.description);
-
-        if let Err(transaction_error) = result {
-            panic!("{}", transaction_error.to_string());
-        }
+        ledger.add_expense(contributions, benefits, &self.description)
     }
 
     fn parse_contributors(arguments: &Vec<String>) -> AmountPerUser<&str> {
@@ -175,42 +168,56 @@ impl AddExpense {
     }
 }
 
-fn main() {
+type ActionResult = result::Result<(), Box<dyn error::Error>>;
+
+fn execute_action(action: Subcommands, store: &dyn LedgerStore) -> ActionResult {
+    match action {
+        Subcommands::New(new_ledger) => {
+            let ledger = Ledger::new(new_ledger.names);
+            store.save(&ledger)
+        }
+        Subcommands::Balances => {
+            let ledger = store.read()?;
+            print_balances(&ledger);
+            Ok(())
+        },
+        Subcommands::List => {
+            let ledger = store.read()?;
+            for t in ledger.get_transactions() {
+                println!("{}", t);
+            };
+            Ok(())
+        }
+        Subcommands::AddUser(add_user) => {
+            let mut ledger = store.read()?;
+            ledger.add_user(&add_user.name);
+            store.save(&ledger)
+        },
+        Subcommands::AddDirect(add_direct) => {
+            let mut ledger = store.read()?;
+            add_direct.add_direct(&mut ledger)?;
+            store.save(&ledger)
+        },
+        Subcommands::AddExpense(add_expense) => {
+            let mut ledger = store.read()?;
+            add_expense.add_expense(&mut ledger)?;
+            store.save(&ledger)
+        }
+    }
+}
+
+fn main() -> ExitCode {
     let args = Cli::parse();
 
     let store = JsonStore::new(&args.path);
+    let action_result: ActionResult = execute_action(args.action, &store);
 
-    match args.action {
-        Subcommands::New(new_ledger) => {
-            let ledger = Ledger::new(new_ledger.names);
-            store.save(&ledger);
+    match action_result {
+        Ok(()) => return ExitCode::SUCCESS,
+        Err(err) => {
+            println!("{}: {}", "Error".bright_red().bold(), err);
+            return ExitCode::FAILURE;
         }
-        Subcommands::Balances => {
-            let ledger = store.read();
-            print_balances(&ledger);
-        },
-        Subcommands::List => {
-            let ledger = store.read();
-            for t in ledger.get_transactions() {
-                println!("{}", t);
-            }
-        }
-        Subcommands::AddUser(add_user) => {
-            let mut ledger = store.read();
-            ledger.add_user(&add_user.name);
-            store.save(&ledger);
-        },
-        Subcommands::AddDirect(add_direct) => {
-            let mut ledger = store.read();
-            add_direct.add_direct(&mut ledger);
-            store.save(&ledger);
-        },
-        Subcommands::AddExpense(add_expense) => {
-            let mut ledger = store.read();
-            add_expense.add_expense(&mut ledger);
-            store.save(&ledger);
-        }
-        _ => todo!("{:?}", &args.action)
     }
 }
 
