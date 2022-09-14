@@ -4,6 +4,7 @@ use serde::{Serialize, Deserialize};
 use colored::Colorize;
 
 use crate::core::user::{UserName, Amount};
+use crate::core::error::TransactionError;
 
 pub type UserAmountMap = HashMap<UserName, Amount>;
 
@@ -64,30 +65,6 @@ impl std::fmt::Display for Transaction {
             write!(f, "{}: {}; ", user, benefit)?;
         }
         return Ok(());
-    }
-}
-
-#[derive(Debug)]
-pub enum TransactionError {
-    InsufficientBenefits{specified: Amount, spent: Amount},
-    ExcessBenefits{specified: Amount, spent: Amount},
-    UnrecognisedUser(UserName)
-}
-
-impl std::fmt::Display for TransactionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let msg: String = match self {
-            TransactionError::InsufficientBenefits { specified, spent } => {
-                format!("{} spent, but {} used", spent, specified)
-            },
-            TransactionError::ExcessBenefits { specified, spent } => {
-                format!("{} spent, but {} used", spent, specified)
-            },
-            TransactionError::UnrecognisedUser(username) => {
-                format!("No such user: {}", username)
-            }
-        };
-        write!(f, "Transaction error: {}", msg)
     }
 }
 

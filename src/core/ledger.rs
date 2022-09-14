@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::core::user::{User, UserName, Amount};
 use crate::core::transaction::{
-    Transaction, TransactionResult, TransactionError,
+    Transaction, TransactionResult,
     Benefit, AmountPerUser, BenefitPerUser, UserAmountMap};
+use crate::core::error::TransactionError;
 
 use serde::{Serialize, Deserialize};
 
@@ -89,7 +90,7 @@ impl Ledger {
         for (user, delta) in &changes {
             match balances.get_mut(user) {
                 Some(val) => *val += delta,
-                None => return Err(TransactionError::UnrecognisedUser(user.clone()))
+                None => return Err(TransactionError::UnknownUser(user.clone()))
             }
         }
         return Ok(());
@@ -118,7 +119,8 @@ impl Ledger {
 #[cfg(test)]
 mod tests {
     use crate::core::{Ledger, User, UserName};
-    use crate::core::transaction::{Benefit, TransactionError};
+    use crate::core::transaction::Benefit;
+    use crate::core::error::TransactionError;
     use crate::transaction::{AmountPerUser, BenefitPerUser};
 
     use rstest::{fixture, rstest};
@@ -174,7 +176,7 @@ mod tests {
         let res = ledger.add_transfer(&bilbo, &merry, 32.0, "");
 
         assert!(res.is_err());
-        assert!(matches!(res, Err(TransactionError::UnrecognisedUser(..))));
+        assert!(matches!(res, Err(TransactionError::UnknownUser(..))));
     }
 
     fn add_transaction_bilbo(ledger: &mut Ledger, user_names: &UserNames4) {
