@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 use colored::Colorize;
+use chrono::{DateTime, offset::Local, Utc};
 
 use crate::core::user::{UserName, Amount};
 use crate::core::error::TransactionError;
@@ -47,14 +48,41 @@ impl<T: Copy> ToOwnedUsers for Vec<(&str, T)> {
 
 #[derive(Serialize, Deserialize)]
 pub struct Transaction {
+    #[serde(with = "datetime_serialization")]
+    pub datetime: DateTime<Utc>,
     contributions: AmountPerUser<UserName>,
     benefits: BenefitPerUser<UserName>,
     pub is_direct: bool,
     pub description: String
 }
 
+mod datetime_serialization {
+    use serde::{de, Serializer, Deserializer, Deserialize};
+    use chrono::{DateTime, Utc};
+
+    pub fn serialize<S>(dt: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        let s = dt.to_rfc3339();
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        s.parse::<DateTime<Utc>>()
+            .map_err(de::Error::custom)
+    }
+}
+
 impl std::fmt::Display for Transaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dt_string = format!("{}", self.datetime.with_timezone(&Local).format("%F %R %:z"));
+        write!(f, "{} ", dt_string.dimmed())?;
+
         write!(f, "{}: ", "From".bold())?;
         for (user, amount) in &self.contributions {
             write!(f, "{}: {}; ", user, amount)?;
@@ -71,8 +99,15 @@ impl std::fmt::Display for Transaction {
 pub type TransactionResult<T> = Result<T, TransactionError>;
 
 impl Transaction {
-    pub fn new(contributions: AmountPerUser<&str>, benefits: BenefitPerUser<&str>, description: &str, direct: bool) -> Transaction {
+    pub fn new(contributions: AmountPerUser<&str>, benefits: BenefitPerUser<&str>,
+        description: &str, direct: bool, opt_time: Option<DateTime<Utc>>) -> Transaction
+    {
+        let datetime = match opt_time {
+            None => Utc::now(),
+            Some(time) => time
+        };
         Transaction {
+            datetime,
             contributions: contributions.to_owned_users(),
             benefits: benefits.to_owned_users(),
             is_direct: direct,
@@ -136,6 +171,7 @@ impl Transaction {
 #[cfg(test)]
 mod tests {
     use crate::{Transaction, transaction::Benefit};
+    use chrono::{TimeZone, Local, Utc};
     use colored;
     use rstest::{fixture, rstest};
 
@@ -150,10 +186,14 @@ mod tests {
             ("Gimli", Benefit::Sum(10.0))
         ];
 
-        let transaction = Transaction::new(contrib, benefit, "", false);
+        let time = Local.ymd(2022, 5, 1).and_hms(12, 0, 0);
+
+        let transaction = Transaction::new(contrib, benefit,
+            "", false, Some(time.with_timezone(&Utc)));
+
         let repr = transaction.to_string();
 
-        assert_eq!(repr, "From: Bilbo: 32; To: Legolas: Even; Gimli: 10; ");
+        assert_eq!(repr, "2022-05-01 12:00 +01:00 From: Bilbo: 32; To: Legolas: Even; Gimli: 10; ");
     }
 
     #[fixture]
@@ -169,7 +209,9 @@ mod tests {
             ("Gimli", Benefit::Sum(10.0))
         ];
 
-        return Transaction::new(contrib, benefit, "", false);
+        let time = Utc.ymd(2022, 5, 1).and_hms(12, 0, 0);
+
+        return Transaction::new(contrib, benefit, "", false, Some(time));
     }
 
     #[rstest]

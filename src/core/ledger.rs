@@ -7,6 +7,7 @@ use crate::core::transaction::{
 use crate::core::error::TransactionError;
 
 use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
 
 
 type UserMap = HashMap<UserName, User>;
@@ -53,17 +54,20 @@ impl Ledger {
         self.users.insert(name.to_owned(), User::new(name));
     }
 
-    pub fn add_expense(&mut self, contributions: AmountPerUser<&str>, benefits: BenefitPerUser<&str>, description: &str) -> TransactionResult<()> {
-        let transaction = Transaction::new(contributions, benefits, description, false);
+    pub fn add_expense(&mut self, contributions: AmountPerUser<&str>, benefits: BenefitPerUser<&str>,
+        description: &str, time: Option<DateTime<Utc>>) -> TransactionResult<()> {
+        let transaction = Transaction::new(contributions, benefits, description, false, time);
         self.add_transaction(transaction)
     }
 
-    pub fn add_transfer(&mut self, from: &str, to: &str, amount: Amount, description: &str) -> TransactionResult<()> {
+    pub fn add_transfer(&mut self, from: &str, to: &str, amount: Amount,
+        description: &str, time: Option<DateTime<Utc>>) -> TransactionResult<()> {
         let transaction = Transaction::new(
             vec![(from, amount)],
             vec![(to, Benefit::Sum(amount))],
             description,
-            true
+            true,
+            time
         );
         self.add_transaction(transaction)
     }
@@ -160,7 +164,7 @@ mod tests {
     fn simple_transfer(mut ledger: Ledger, user_names: UserNames4) {
         let (bilbo, frodo, _, gimli) = user_names;
 
-        ledger.add_transfer(&bilbo, &frodo, 32.0, "").unwrap();
+        ledger.add_transfer(&bilbo, &frodo, 32.0, "", None).unwrap();
 
         assert_eq!(ledger.total_spend, 0.0);
         assert_eq!(*ledger.balances.get(&bilbo).unwrap(), 32.0);
@@ -173,7 +177,7 @@ mod tests {
         let bilbo = user_names.0;
         let merry = String::from("Merry");
 
-        let res = ledger.add_transfer(&bilbo, &merry, 32.0, "");
+        let res = ledger.add_transfer(&bilbo, &merry, 32.0, "", None);
 
         assert!(res.is_err());
         assert!(matches!(res, Err(TransactionError::UnknownUser(..))));
@@ -187,7 +191,7 @@ mod tests {
             (legolas, Benefit::Even),
             (bilbo, Benefit::Even)
         ];
-        ledger.add_expense(contributions, benefits, "").unwrap()
+        ledger.add_expense(contributions, benefits, "", None).unwrap()
     }
 
     fn add_transaction_frodo(ledger: &mut Ledger, user_names: &UserNames4) {
@@ -198,7 +202,7 @@ mod tests {
             (legolas, Benefit::Sum(6.0)),
             (gimli, Benefit::Even)
         ];
-        ledger.add_expense(contributions, benefits, "").unwrap()
+        ledger.add_expense(contributions, benefits, "", None).unwrap()
     }
 
     #[rstest]
@@ -259,6 +263,7 @@ mod serialise_tests {
 
     use rstest::{fixture, rstest};
     use serde_json::json;
+    use chrono::{Utc, Local, DateTime, TimeZone};
 
     type UserNames4 = (UserName, UserName, UserName, UserName);
 
@@ -285,7 +290,9 @@ mod serialise_tests {
             (&gimli, Benefit::Sum(10.0))
         ];
 
-        return Transaction::new(contrib, benefit, "", false);
+        let time = Local.ymd(2022, 5, 1).and_hms(12, 0, 0);
+
+        return Transaction::new(contrib, benefit, "", false, Some(time.with_timezone(&Utc)));
     }
 
     #[fixture]
@@ -301,7 +308,8 @@ mod serialise_tests {
                 ["Gimli", {"Sum": 10.0}],
             ],
             "is_direct": false,
-            "description": ""
+            "description": "",
+            "datetime": "2022-05-01T11:00:00+00:00"
         })
     }
 

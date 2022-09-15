@@ -1,30 +1,75 @@
 {
     "balances": {
-        "Bilbo": 32.0,
+        "Gimli": -10.0,
+        "Legolas": 0.0,
         "Frodo": -5.0,
-        "Legolas": -17.0,
-        "Gimli": -10.0
+        "Bilbo": 15.0
     },
     "users": {
-        "Bilbo": {"name": "Bilbo"},
-        "Frodo": {"name": "Frodo"},
-        "Legolas": {"name": "Legolas"},
-        "Gimli": {"name": "Gimli"}
+        "Legolas": {
+            "name": "Legolas"
+        },
+        "Gimli": {
+            "name": "Gimli"
+        },
+        "Bilbo": {
+            "name": "Bilbo"
+        },
+        "Frodo": {
+            "name": "Frodo"
+        }
     },
-    "total_spend": 44.0,
     "transactions": [
         {
+            "datetime": "2022-05-01T11:00:00+00:00",
             "contributions": [
-                ["Bilbo", 32.0],
-                ["Frodo", 12.0]
+                [
+                    "Bilbo",
+                    32.0
+                ],
+                [
+                    "Frodo",
+                    12.0
+                ]
             ],
             "benefits": [
-                ["Legolas", "Even"],
-                ["Frodo", "Even"],
-                ["Gimli", {"Sum": 10.0}]
+                [
+                    "Legolas",
+                    "Even"
+                ],
+                [
+                    "Frodo",
+                    "Even"
+                ],
+                [
+                    "Gimli",
+                    {
+                        "Sum": 10.0
+                    }
+                ]
             ],
             "is_direct": false,
             "description": ""
+        },
+        {
+            "datetime": "2022-09-15T22:56:20.914923853+00:00",
+            "contributions": [
+                [
+                    "Legolas",
+                    17.0
+                ]
+            ],
+            "benefits": [
+                [
+                    "Bilbo",
+                    {
+                        "Sum": 17.0
+                    }
+                ]
+            ],
+            "is_direct": true,
+            "description": "Transfer"
         }
-    ]
+    ],
+    "total_spend": 44.0
 }

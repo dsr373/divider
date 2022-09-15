@@ -86,7 +86,7 @@ struct AddDirect {
 
 impl AddDirect {
     fn add_direct(&self, ledger: &mut Ledger) -> TransactionResult<()> {
-        ledger.add_transfer(&self.from, &self.to, self.amount, &self.description)
+        ledger.add_transfer(&self.from, &self.to, self.amount, &self.description, None)
     }
 }
 
@@ -117,7 +117,7 @@ impl AddExpense {
         let contributions: AmountPerUser<&str> = AddExpense::parse_contributors(&self.from);
         let benefits: BenefitPerUser<&str> = AddExpense::parse_beneficiaries(&self.to);
 
-        ledger.add_expense(contributions, benefits, &self.description)
+        ledger.add_expense(contributions, benefits, &self.description, None)
     }
 
     fn parse_contributors(arguments: &Vec<String>) -> AmountPerUser<&str> {
