@@ -1,3 +1,4 @@
+use chrono::{Utc, TimeZone, DateTime};
 use divider::{Ledger, Amount,
     backend::{LedgerStore, JsonStore},
     transaction::{BenefitPerUser, Benefit, AmountPerUser, TransactionResult}};
@@ -66,6 +67,11 @@ struct AddUser {
     name: String
 }
 
+fn parse_time_minutes(arg: &str) -> Result<DateTime<Utc>, chrono::format::ParseError> {
+    let local_t = chrono::offset::Local.datetime_from_str(arg, "%F %R")?;
+    return Ok(local_t.with_timezone(&Utc));
+}
+
 #[derive(Args, Debug)]
 struct AddDirect {
     /// Name of user that paid
@@ -81,12 +87,16 @@ struct AddDirect {
 
     /// Describe the purpose of the transfer
     #[clap(short='d', long, value_parser, default_value_t = String::from("Transfer"))]
-    description: String
+    description: String,
+
+    /// The time the transaction happened. Example format: "2022-05-01 12:21". Default is now.
+    #[clap(short='T', long, parse(try_from_str = parse_time_minutes))]
+    time: Option<DateTime<Utc>>
 }
 
 impl AddDirect {
     fn add_direct(&self, ledger: &mut Ledger) -> TransactionResult<()> {
-        ledger.add_transfer(&self.from, &self.to, self.amount, &self.description, None)
+        ledger.add_transfer(&self.from, &self.to, self.amount, &self.description, self.time)
     }
 }
 
@@ -109,7 +119,11 @@ struct AddExpense {
 
     /// Describe the purpose of the expense
     #[clap(short, long, value_parser, default_value_t = String::from(""))]
-    description: String
+    description: String,
+
+    /// The time the transaction happened. Example format: "2022-05-01 12:21". Default is now.
+    #[clap(short='T', long, parse(try_from_str = parse_time_minutes))]
+    time: Option<DateTime<Utc>>
 }
 
 impl AddExpense {
@@ -117,7 +131,7 @@ impl AddExpense {
         let contributions: AmountPerUser<&str> = AddExpense::parse_contributors(&self.from);
         let benefits: BenefitPerUser<&str> = AddExpense::parse_beneficiaries(&self.to);
 
-        ledger.add_expense(contributions, benefits, &self.description, None)
+        ledger.add_expense(contributions, benefits, &self.description, self.time)
     }
 
     fn parse_contributors(arguments: &Vec<String>) -> AmountPerUser<&str> {
