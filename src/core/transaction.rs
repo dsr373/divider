@@ -48,6 +48,7 @@ impl<T: Copy> ToOwnedUsers for Vec<(&str, T)> {
 
 #[derive(Serialize, Deserialize)]
 pub struct Transaction {
+    pub id: usize,
     #[serde(with = "datetime_serialization")]
     pub datetime: DateTime<Utc>,
     contributions: AmountPerUser<UserName>,
@@ -80,6 +81,8 @@ mod datetime_serialization {
 
 impl std::fmt::Display for Transaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04x}\t", self.id)?;
+
         let dt_string = format!("{}", self.datetime.with_timezone(&Local).format("%F %R %:z"));
         write!(f, "{} ", dt_string.dimmed())?;
 
@@ -92,6 +95,8 @@ impl std::fmt::Display for Transaction {
         for (user, benefit) in &self.benefits {
             write!(f, "{}: {}; ", user, benefit)?;
         }
+
+        write!(f, "{}: {}", "Description".bold(), &self.description)?;
         return Ok(());
     }
 }
@@ -100,18 +105,23 @@ pub type TransactionResult<T> = Result<T, TransactionError>;
 
 impl Transaction {
     pub fn new(contributions: AmountPerUser<&str>, benefits: BenefitPerUser<&str>,
-        description: &str, direct: bool, opt_time: Option<DateTime<Utc>>) -> Transaction
+        description: &str, direct: bool, opt_id: Option<usize>, opt_time: Option<DateTime<Utc>>) -> Transaction
     {
         let datetime = match opt_time {
             None => Utc::now(),
             Some(time) => time
         };
+        let id = match opt_id {
+            None => 0,
+            Some(number) => number
+        };
         Transaction {
+            id,
             datetime,
             contributions: contributions.to_owned_users(),
             benefits: benefits.to_owned_users(),
             is_direct: direct,
-            description: description.to_owned() }
+            description: description.to_string() }
     }
 
     pub fn total_spending(&self) -> Amount {
@@ -189,11 +199,11 @@ mod tests {
         let time = Local.ymd(2022, 5, 1).and_hms(12, 0, 0);
 
         let transaction = Transaction::new(contrib, benefit,
-            "", false, Some(time.with_timezone(&Utc)));
+            "Dinner", false, Some(214), Some(time.with_timezone(&Utc)));
 
         let repr = transaction.to_string();
 
-        assert_eq!(repr, "2022-05-01 12:00 +01:00 From: Bilbo: 32; To: Legolas: Even; Gimli: 10; ");
+        assert_eq!(repr, "00d6\t2022-05-01 12:00 +01:00 From: Bilbo: 32; To: Legolas: Even; Gimli: 10; Description: Dinner");
     }
 
     #[fixture]
@@ -211,7 +221,8 @@ mod tests {
 
         let time = Utc.ymd(2022, 5, 1).and_hms(12, 0, 0);
 
-        return Transaction::new(contrib, benefit, "", false, Some(time));
+        return Transaction::new(contrib, benefit, "", false,
+            None, Some(time));
     }
 
     #[rstest]

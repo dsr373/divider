@@ -14,6 +14,7 @@ type UserMap = HashMap<UserName, User>;
 
 #[derive(Serialize, Deserialize)]
 pub struct Ledger {
+    next_id: usize,
     balances: UserAmountMap,
     users: UserMap,
     transactions: Vec<Transaction>,
@@ -33,7 +34,7 @@ impl Ledger {
             .map(|user_name| (String::from(user_name.as_ref()), 0.0 as Amount))
             .collect();
 
-        return Ledger { balances, users, transactions: Vec::new(), total_spend: 0.0 as Amount };
+        return Ledger { next_id: 1, balances, users, transactions: Vec::new(), total_spend: 0.0 };
     }
 
     pub fn get_users(&self) -> Vec<&User> {
@@ -56,7 +57,13 @@ impl Ledger {
 
     pub fn add_expense(&mut self, contributions: AmountPerUser<&str>, benefits: BenefitPerUser<&str>,
         description: &str, time: Option<DateTime<Utc>>) -> TransactionResult<()> {
-        let transaction = Transaction::new(contributions, benefits, description, false, time);
+        let transaction = Transaction::new(
+            contributions,
+            benefits,
+            description,
+            false,
+            None,
+            time);
         self.add_transaction(transaction)
     }
 
@@ -67,19 +74,26 @@ impl Ledger {
             vec![(to, Benefit::Sum(amount))],
             description,
             true,
+            None,
             time
         );
         self.add_transaction(transaction)
     }
 
-    pub fn add_transaction(&mut self, transaction: Transaction) -> TransactionResult<()> {
+    pub fn add_transaction(&mut self, mut transaction: Transaction) -> TransactionResult<()> {
         Ledger::apply_transaction(&mut self.total_spend, &mut self.balances, &transaction)?;
+        self.assign_transaction_id(&mut transaction);
         self.transactions.push(transaction);
 
         if self.needs_consistency_check() {
             self.reapply_all()?;
         }
         return Ok(());
+    }
+
+    fn assign_transaction_id(&mut self, transaction: &mut Transaction) {
+        transaction.id = self.next_id;
+        self.next_id += 1;
     }
 
     fn apply_transaction(total_spend: &mut Amount, balances: &mut UserAmountMap, transaction: &Transaction) -> TransactionResult<()> {
@@ -263,7 +277,7 @@ mod serialise_tests {
 
     use rstest::{fixture, rstest};
     use serde_json::json;
-    use chrono::{Utc, Local, DateTime, TimeZone};
+    use chrono::{Utc, TimeZone};
 
     type UserNames4 = (UserName, UserName, UserName, UserName);
 
@@ -290,14 +304,16 @@ mod serialise_tests {
             (&gimli, Benefit::Sum(10.0))
         ];
 
-        let time = Local.ymd(2022, 5, 1).and_hms(12, 0, 0);
+        let time = Utc.ymd(2022, 5, 1).and_hms(11, 0, 0);
 
-        return Transaction::new(contrib, benefit, "", false, Some(time.with_timezone(&Utc)));
+        return Transaction::new(contrib, benefit, "", false,
+            Some(3), Some(time));
     }
 
     #[fixture]
     fn transaction_json() -> serde_json::Value {
         json!({
+            "id": 3,
             "contributions": [
                 ["Bilbo", 32.0],
                 ["Frodo", 12.0]
