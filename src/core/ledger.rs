@@ -325,7 +325,7 @@ mod serialise_tests {
             ],
             "is_direct": false,
             "description": "",
-            "datetime": "2022-05-01T11:00:00+00:00"
+            "datetime": "2022-05-01T11:00:00Z"
         })
     }
 

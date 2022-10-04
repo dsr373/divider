@@ -145,9 +145,7 @@ impl Transaction {
             });
     }
 
-    pub fn balance_updates(&self) -> TransactionResult<UserAmountMap> {
-        let mut balance_delta: UserAmountMap = HashMap::new();
-
+    fn benefits_per_even(&self) -> TransactionResult<Amount> {
         let spending = self.total_spending();
         let specified_benefits = self.specified_benefits();
         if specified_benefits > spending {
@@ -158,9 +156,17 @@ impl Transaction {
         let total_amount_evens = spending - specified_benefits;
         if total_amount_evens > 0.0 && num_evens == 0 {
             return Err(TransactionError::InsufficientBenefits{specified: specified_benefits, spent: spending})
+        } else if total_amount_evens == 0.0 && num_evens == 0 {
+            return Ok(0.0);
         }
 
-        let benefit_per_even = total_amount_evens / (num_evens as f32);
+        return Ok(total_amount_evens / (num_evens as f32));
+    }
+
+    pub fn balance_updates(&self) -> TransactionResult<UserAmountMap> {
+        let mut balance_delta: UserAmountMap = HashMap::new();
+
+        let benefit_per_even = self.benefits_per_even()?;
 
         for (user, contrib) in &self.contributions {
             balance_delta.insert(user.clone(), *contrib);
@@ -180,7 +186,7 @@ impl Transaction {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Transaction, transaction::Benefit};
+    use crate::{Transaction, transaction::Benefit, core::TransactionError};
     use chrono::{TimeZone, Local, Utc};
     use colored;
     use rstest::{fixture, rstest};
@@ -244,5 +250,63 @@ mod tests {
         assert_eq!(*balance_delta.get("Legolas").unwrap(), -17.0);
         assert_eq!(*balance_delta.get("Frodo").unwrap(), -5.0);
         assert_eq!(*balance_delta.get("Gimli").unwrap(), -10.0);
+    }
+
+    #[rstest]
+    fn insufficient_benefits() {
+        let contrib = vec![
+            ("Bilbo", 32.0)
+        ];
+
+        let benefit = vec![
+            ("Gimli", Benefit::Sum(10.0)),
+            ("Frodo", Benefit::Sum(12.0))
+        ];
+
+        let result = Transaction::new(contrib, benefit, "", false, None, None).balance_updates();
+
+        match result {
+            Err(TransactionError::InsufficientBenefits { specified, spent }) if specified == 22.0 && spent == 32.0 => {},
+            _ => panic!("Result does not match InsufficientBenefits: {:?}", &result)
+        }
+    }
+
+    #[rstest]
+    fn excess_benefits() {
+        let contrib = vec![
+            ("Bilbo", 32.0)
+        ];
+
+        let benefit = vec![
+            ("Gimli", Benefit::Sum(40.0)),
+            ("Frodo", Benefit::Even),
+            ("Legolas", Benefit::Even)
+        ];
+
+        let result = Transaction::new(contrib, benefit, "", false, None, None).balance_updates();
+
+        match result {
+            Err(TransactionError::ExcessBenefits { specified, spent }) if specified == 40.0 && spent == 32.0 => {},
+            _ => panic!("Result does not match ExcessBenefits: {:?}", &result)
+        }
+    }
+
+    #[rstest]
+    fn no_evens() {
+        let contrib = vec![
+            ("Bilbo", 32.0)
+        ];
+
+        let benefit = vec![
+            ("Gimli", Benefit::Sum(22.0)),
+            ("Frodo", Benefit::Sum(10.0))
+        ];
+
+        let balance_delta = Transaction::new(contrib, benefit, "", false, None, None).balance_updates().unwrap();
+
+        assert_eq!(*balance_delta.get("Bilbo").unwrap(), 32.0);
+        assert_eq!(*balance_delta.get("Gimli").unwrap(), -22.0);
+        assert_eq!(*balance_delta.get("Frodo").unwrap(), -10.0);
+        assert!(!balance_delta.contains_key("Legolas"));
     }
 }
