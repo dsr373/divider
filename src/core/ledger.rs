@@ -307,13 +307,13 @@ mod serialise_tests {
         let time = Utc.ymd(2022, 5, 1).and_hms(11, 0, 0);
 
         return Transaction::new(contrib, benefit, "", false,
-            Some(3), Some(time));
+            Some(1), Some(time));
     }
 
     #[fixture]
     fn transaction_json() -> serde_json::Value {
         json!({
-            "id": 3,
+            "id": 1,
             "contributions": [
                 ["Bilbo", 32.0],
                 ["Frodo", 12.0]
@@ -344,6 +344,7 @@ mod serialise_tests {
                 "Legolas": {"name": "Legolas"},
                 "Gimli": {"name": "Gimli"},
             },
+            "next_id": 2,
             "total_spend": 44.0,
             "transactions": [transaction_json]
         })
