@@ -129,6 +129,32 @@ impl Transaction {
             .map(|contrib| contrib.1).sum();
     }
 
+    pub fn reverse(&self) -> TransactionResult<Transaction> {
+        let mut contributions: AmountPerUser<String> = Vec::new();
+        let mut benefits: BenefitPerUser<String> = Vec::new();
+
+        let benefit_per_even = self.benefits_per_even()?;
+
+        for (user, benefit) in &self.benefits {
+            match benefit {
+                Benefit::Sum(number) => contributions.push((user.clone(), *number)),
+                Benefit::Even => contributions.push((user.clone(), benefit_per_even))
+            }
+        }
+
+        for (user, contrib) in &self.contributions {
+            benefits.push((user.clone(), Benefit::Sum(*contrib)));
+        }
+
+        return Ok(Transaction {
+            id: 0,
+            datetime: Utc::now(),
+            contributions,
+            benefits,
+            is_direct: false,
+            description: format!("Undo {:04x}", self.id) });
+    }
+
     fn specified_benefits(&self) -> Amount {
         return self.benefits.iter()
             .map(|user_benefit| match user_benefit.1 {
@@ -309,4 +335,6 @@ mod tests {
         assert_eq!(*balance_delta.get("Frodo").unwrap(), -10.0);
         assert!(!balance_delta.contains_key("Legolas"));
     }
+
+    // TODO: test reverse
 }
