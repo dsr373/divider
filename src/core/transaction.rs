@@ -65,7 +65,7 @@ mod datetime_serialization {
     where
         S: Serializer
     {
-        let s = dt.to_rfc3339();
+        let s = dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
         serializer.serialize_str(&s)
     }
 

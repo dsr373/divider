@@ -22,7 +22,7 @@ impl LedgerStore for JsonStore {
     }
 
     fn save(&self, ledger: &Ledger) -> Result<()> {
-        let ledger_str = serde_json::to_string(ledger)?;
+        let ledger_str = serde_json::to_string_pretty(ledger)?;
         fs::write(&self.file_path, ledger_str)?;
         return Ok(());
     }
