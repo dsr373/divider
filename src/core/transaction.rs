@@ -130,21 +130,17 @@ impl Transaction {
     }
 
     pub fn reverse(&self) -> TransactionResult<Transaction> {
-        let mut contributions: AmountPerUser<String> = Vec::new();
-        let mut benefits: BenefitPerUser<String> = Vec::new();
-
         let benefit_per_even = self.benefits_per_even()?;
 
-        for (user, benefit) in &self.benefits {
+        let contributions = self.benefits.iter().map(|(user, benefit)| {
             match benefit {
-                Benefit::Sum(number) => contributions.push((user.clone(), *number)),
-                Benefit::Even => contributions.push((user.clone(), benefit_per_even))
+                Benefit::Sum(number) => (user.clone(), *number),
+                Benefit::Even => (user.clone(), benefit_per_even)
             }
-        }
+        }).collect();
 
-        for (user, contrib) in &self.contributions {
-            benefits.push((user.clone(), Benefit::Sum(*contrib)));
-        }
+        let benefits = self.contributions.iter()
+            .map(|(user, contrib)| (user.clone(), Benefit::Sum(*contrib))).collect();
 
         return Ok(Transaction {
             id: 0,
@@ -276,6 +272,22 @@ mod tests {
         assert_eq!(*balance_delta.get("Legolas").unwrap(), -17.0);
         assert_eq!(*balance_delta.get("Frodo").unwrap(), -5.0);
         assert_eq!(*balance_delta.get("Gimli").unwrap(), -10.0);
+    }
+
+    #[rstest]
+    fn reverse_transaction(transaction: Transaction) {
+        let reversed = transaction.reverse().unwrap();
+
+        assert_eq!(reversed.specified_benefits(), 44.0);
+
+        let reversed_delta = reversed.balance_updates().unwrap();
+        let original_delta = transaction.balance_updates().unwrap();
+        assert_eq!(reversed_delta.len(), original_delta.len());
+
+        for (user, delta) in &reversed_delta {
+            assert!(original_delta.contains_key(user));
+            assert_eq!(original_delta.get_key_value(user).unwrap(), (user, &-delta));
+        }
     }
 
     #[rstest]
