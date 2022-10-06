@@ -91,6 +91,14 @@ impl Ledger {
         return Ok(());
     }
 
+    pub fn reverse_by_id(&mut self, id: usize) -> TransactionResult<()> {
+        let found = self.transactions.iter().find(|&t| { t.id == id });
+        match found {
+            None => Err(TransactionError::UnknownTransactionId(id)),
+            Some(transaction) => self.add_transaction(transaction.reverse()?)
+        }
+    }
+
     fn assign_transaction_id(&mut self, transaction: &mut Transaction) {
         transaction.id = self.next_id;
         self.next_id += 1;

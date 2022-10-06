@@ -3,7 +3,7 @@ use divider::{Ledger, Amount,
     backend::{LedgerStore, JsonStore},
     transaction::{BenefitPerUser, Benefit, AmountPerUser, TransactionResult}};
 
-use std::path::PathBuf;
+use std::{path::PathBuf, ops::Sub};
 use std::error;
 use std::result;
 use std::process::ExitCode;
@@ -26,24 +26,31 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Subcommands {
     /// Create new ledger
-    New(NewLedger),
+    New {
+        /// Names of the users on the ledger
+        #[clap(value_parser, required=true, min_values=1)]
+        names: Vec<String>
+    },
     /// Read and display balances
     Balances,
     /// List all transactions
     List,
     /// Add a new user
-    AddUser(AddUser),
+    AddUser {
+        /// Name of the user to be added to the ledger
+        #[clap(value_parser)]
+        name: String
+    },
     /// Add a new direct transfer
     AddDirect(AddDirect),
     /// Add a new expense
-    AddExpense(AddExpense)
-}
-
-#[derive(Args, Debug)]
-struct NewLedger {
-    /// Names of the users on the ledger
-    #[clap(value_parser, required=true, min_values=1)]
-    names: Vec<String>
+    AddExpense(AddExpense),
+    /// Undo an existing transaction
+    Undo  {
+        /// Id of the transaction to undo (as appears in output of 'list')
+        #[clap(value_parser, required=true)]
+        id: usize
+    }
 }
 
 fn print_balances(ledger: &Ledger) {
@@ -58,13 +65,6 @@ fn print_balances(ledger: &Ledger) {
         let fmt_balance = color(format!("{:.2}", balance).white());
         println!("{}: {}", user, fmt_balance);
     }
-}
-
-#[derive(Args, Debug)]
-struct AddUser {
-    /// Name of the user to be added to the ledger
-    #[clap(value_parser)]
-    name: String
 }
 
 fn parse_time_minutes(arg: &str) -> Result<DateTime<Utc>, chrono::format::ParseError> {
@@ -186,8 +186,8 @@ type ActionResult = result::Result<(), Box<dyn error::Error>>;
 
 fn execute_action(action: Subcommands, store: &dyn LedgerStore) -> ActionResult {
     match action {
-        Subcommands::New(new_ledger) => {
-            let ledger = Ledger::new(new_ledger.names);
+        Subcommands::New{ names } => {
+            let ledger = Ledger::new(names);
             store.save(&ledger)
         }
         Subcommands::Balances => {
@@ -202,9 +202,9 @@ fn execute_action(action: Subcommands, store: &dyn LedgerStore) -> ActionResult 
             };
             Ok(())
         }
-        Subcommands::AddUser(add_user) => {
+        Subcommands::AddUser{ name } => {
             let mut ledger = store.read()?;
-            ledger.add_user(&add_user.name);
+            ledger.add_user(&name);
             store.save(&ledger)
         },
         Subcommands::AddDirect(add_direct) => {
@@ -215,6 +215,12 @@ fn execute_action(action: Subcommands, store: &dyn LedgerStore) -> ActionResult 
         Subcommands::AddExpense(add_expense) => {
             let mut ledger = store.read()?;
             add_expense.add_expense(&mut ledger)?;
+            store.save(&ledger)
+        },
+        Subcommands::Undo{ id } => {
+            todo!("parsing hex numbers into usize");
+            let mut ledger = store.read()?;
+            ledger.reverse_by_id(id)?;
             store.save(&ledger)
         }
     }

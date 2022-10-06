@@ -18,7 +18,10 @@ pub enum TransactionError {
     },
     /// Occurs when attempting to register a transaction
     /// involving a user not registered on a ledger.
-    UnknownUser(UserName)
+    UnknownUser(UserName),
+    /// Occurs when attempting to reference a transaction
+    /// by an id which does not exist on the ledger
+    UnknownTransactionId(usize)
 }
 
 impl std::fmt::Display for TransactionError {
@@ -32,6 +35,9 @@ impl std::fmt::Display for TransactionError {
             },
             TransactionError::UnknownUser(username) => {
                 write!(f, "no such user: {}", username)
+            },
+            TransactionError::UnknownTransactionId(id) => {
+                write!(f, "no such transaction id: {}", id)
             }
         }
     }
