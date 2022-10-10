@@ -5,6 +5,10 @@ edition = "2021"
 authors=["Dan Seremet", ]
 description="Divide up a set of bills in a group"
 
+[[bin]]
+name="divider-cli"
+path="src/bin/cli.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
