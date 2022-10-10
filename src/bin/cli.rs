@@ -3,7 +3,7 @@ use divider::{Ledger, Amount,
     backend::{LedgerStore, JsonStore},
     transaction::{BenefitPerUser, Benefit, AmountPerUser, TransactionResult}};
 
-use std::{path::PathBuf, ops::Sub};
+use std::path::PathBuf;
 use std::error;
 use std::result;
 use std::process::ExitCode;
@@ -48,9 +48,13 @@ enum Subcommands {
     /// Undo an existing transaction
     Undo  {
         /// Id of the transaction to undo (as appears in output of 'list')
-        #[clap(value_parser, required=true)]
+        #[clap(parse(try_from_str = parse_hex_to_int), required=true)]
         id: usize
     }
+}
+
+fn parse_hex_to_int(arg: &str) -> Result<usize, std::num::ParseIntError> {
+    usize::from_str_radix(arg, 16)
 }
 
 fn print_balances(ledger: &Ledger) {
@@ -218,7 +222,6 @@ fn execute_action(action: Subcommands, store: &dyn LedgerStore) -> ActionResult 
             store.save(&ledger)
         },
         Subcommands::Undo{ id } => {
-            todo!("parsing hex numbers into usize");
             let mut ledger = store.read()?;
             ledger.reverse_by_id(id)?;
             store.save(&ledger)
@@ -246,6 +249,7 @@ mod parser_tests {
     use divider::transaction::Benefit;
     use rstest::rstest;
     use crate::AddExpense;
+    use crate::parse_hex_to_int;
 
     #[rstest]
     fn parse_contributions_correct() {
@@ -328,5 +332,13 @@ mod parser_tests {
         let arguments = cmdline.split(' ')
             .map(|s| s.to_string()).collect::<Vec<String>>();
         let _ = AddExpense::parse_beneficiaries(&arguments);
+    }
+
+    #[rstest]
+    fn parse_hex() {
+        assert_eq!(parse_hex_to_int("00c0").unwrap(), 12 * 16);
+        assert_eq!(parse_hex_to_int("00c5").unwrap(), 12 * 16 + 5);
+        assert_eq!(parse_hex_to_int("0ad8").unwrap(), 10 * 256 + 13 * 16 + 8);
+        assert!(   parse_hex_to_int("00ga").is_err());
     }
 }
