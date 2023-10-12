@@ -13,13 +13,19 @@ fn index() -> &'static str {
 }
 
 #[get("/ledgers")]
-fn list_ledgers() -> String {
+async fn list_ledgers() -> String {
     let config = AppConfig::read(SERVER_CONFIG)
+        .await
         .expect("failed to read app configuration");
 
     let ledger_ids: Vec<_> = config.ledgers.keys().collect();
     return serde_json::json!(ledger_ids).to_string();
 }
+
+// #[get("/ledger/<name>")]
+// fn list_one_ledger(name: &str) -> String {
+
+// }
 
 #[rocket::main]
 async fn main() -> Result<(), rocket::Error> {
