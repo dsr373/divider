@@ -1,23 +1,23 @@
 {
-  "next_id": 4,
+  "next_id": 6,
   "balances": {
+    "Bilbo": -6.0,
+    "Frodo": -28.0,
     "Legolas": -2.0,
-    "Frodo": -5.0,
-    "Gimli": 0.0,
-    "Bilbo": 7.0
+    "Gimli": 36.0
   },
   "users": {
-    "Frodo": {
-      "name": "Frodo"
-    },
     "Legolas": {
       "name": "Legolas"
+    },
+    "Bilbo": {
+      "name": "Bilbo"
     },
     "Gimli": {
       "name": "Gimli"
     },
-    "Bilbo": {
-      "name": "Bilbo"
+    "Frodo": {
+      "name": "Frodo"
     }
   },
   "transactions": [
@@ -92,7 +92,53 @@
       ],
       "is_direct": true,
       "description": "Transfer"
+    },
+    {
+      "id": 4,
+      "datetime": "2022-10-10T22:00:02Z",
+      "contributions": [
+        [
+          "Bilbo",
+          10.0
+        ]
+      ],
+      "benefits": [
+        [
+          "Gimli",
+          {
+            "Sum": 10.0
+          }
+        ]
+      ],
+      "is_direct": false,
+      "description": "Undo 0003"
+    },
+    {
+      "id": 5,
+      "datetime": "2022-06-21T22:30:00Z",
+      "contributions": [
+        [
+          "Gimli",
+          69.0
+        ]
+      ],
+      "benefits": [
+        [
+          "Bilbo",
+          "Even"
+        ],
+        [
+          "Frodo",
+          "Even"
+        ],
+        [
+          "Gimli",
+          "Even"
+        ]
+      ],
+      "is_direct": false,
+      "description": "Weapons"
     }
   ],
-  "total_spend": 44.0
+  "total_spend": 123.0
 }

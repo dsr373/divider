@@ -9,6 +9,10 @@ description="Divide up a set of bills in a group"
 name="divider-cli"
 path="src/bin/cli.rs"
 
+[[bin]]
+name="divider-srv"
+path="src/server/server.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -16,6 +20,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "1.0"
 rstest = "0.15"
-clap = { version = "3.2", features = ["derive"] }
+clap = { version = "4.4", features = ["derive"] }
 colored = "2.0"
 chrono = "0.4"
+rocket = "0.5.0-rc.2"
+toml = "0.8"
+anyhow = "1.0"

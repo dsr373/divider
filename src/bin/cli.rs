@@ -1,4 +1,4 @@
-use chrono::{Utc, TimeZone, DateTime};
+use chrono::{Utc, DateTime};
 use divider::{Ledger, Amount,
     backend::{LedgerStore, JsonStore},
     transaction::{BenefitPerUser, Benefit, AmountPerUser, TransactionResult}};
@@ -8,18 +8,19 @@ use std::error;
 use std::result;
 use std::process::ExitCode;
 
+use anyhow::anyhow;
 use colored::Colorize;
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[clap(version, about, propagate_version = true)]
+#[command(version, about, propagate_version = true)]
 struct Cli {
    /// Path to ledger file to operate on
-   #[clap(value_parser)]
+   #[arg(value_parser)]
     path: PathBuf,
 
    /// Action to perform
-   #[clap(subcommand)]
+   #[command(subcommand)]
    action: Subcommands,
 }
 
@@ -28,7 +29,7 @@ enum Subcommands {
     /// Create new ledger
     New {
         /// Names of the users on the ledger
-        #[clap(value_parser, required=true, min_values=1)]
+        #[arg(required=true)]
         names: Vec<String>
     },
     /// Read and display balances
@@ -38,7 +39,7 @@ enum Subcommands {
     /// Add a new user
     AddUser {
         /// Name of the user to be added to the ledger
-        #[clap(value_parser)]
+        #[arg()]
         name: String
     },
     /// Add a new direct transfer
@@ -48,7 +49,7 @@ enum Subcommands {
     /// Undo an existing transaction
     Undo  {
         /// Id of the transaction to undo (as appears in output of 'list')
-        #[clap(parse(try_from_str = parse_hex_to_int), required=true)]
+        #[arg(value_parser = parse_hex_to_int, required=true)]
         id: usize
     }
 }
@@ -71,30 +72,35 @@ fn print_balances(ledger: &Ledger) {
     }
 }
 
-fn parse_time_minutes(arg: &str) -> Result<DateTime<Utc>, chrono::format::ParseError> {
-    let local_t = chrono::offset::Local.datetime_from_str(arg, "%F %R")?;
+fn parse_time_minutes(arg: &str) -> anyhow::Result<DateTime<Utc>> {
+    let naive_t = chrono::NaiveDateTime::parse_from_str(arg, "%F %R")?;
+    let local_t = match naive_t.and_local_timezone(chrono::offset::Local) {
+        chrono::LocalResult::None => Err(anyhow!("no such date time in local timezone: {}", naive_t)),
+        chrono::LocalResult::Single(t) => Ok(t),
+        chrono::LocalResult::Ambiguous(_, _) => Err(anyhow!("time is ambiguous in local timezone: {}", naive_t)),
+    }?;
     return Ok(local_t.with_timezone(&Utc));
 }
 
 #[derive(Args, Debug)]
 struct AddDirect {
     /// Name of user that paid
-    #[clap(short='f', long, value_parser)]
+    #[arg(short='f', long)]
     from: String,
 
     /// Name of user that got paid
-    #[clap(short='t', long, value_parser)]
+    #[arg(short='t', long)]
     to: String,
 
-    #[clap(short='a', long, value_parser)]
+    #[arg(short='a', long)]
     amount: Amount,
 
     /// Describe the purpose of the transfer
-    #[clap(short='d', long, value_parser, default_value_t = String::from("Transfer"))]
+    #[arg(short='d', long, default_value_t = String::from("Transfer"))]
     description: String,
 
     /// The time the transaction happened. Example format: "2022-05-01 12:21". Default is now.
-    #[clap(short='T', long, parse(try_from_str = parse_time_minutes))]
+    #[arg(short='T', long, value_parser = parse_time_minutes)]
     time: Option<DateTime<Utc>>
 }
 
@@ -108,7 +114,7 @@ impl AddDirect {
 struct AddExpense {
     /// Pairs of: (name, amount) contributed to this expense. space separated.
     /// Example: `Donald 5 Will 29`
-    #[clap(short, long, value_parser, required=true, min_values=1, multiple_occurrences=false)]
+    #[arg(short, long, required=true, num_args=2..)]
     from: Vec<String>,
 
     /// Names of beneficiaries of the expense. Specifying
@@ -118,15 +124,15 @@ struct AddExpense {
     /// Examples:
     /// `Ben George Mike` -> split evenly between all three.
     /// `Ben 14 George Mike` -> Ben spent 14 and the rest is split evenly between George and Mike.
-    #[clap(short, long, value_parser, required=true, min_values=1, multiple_occurrences=false)]
+    #[arg(short, long, required=true)]
     to: Vec<String>,
 
     /// Describe the purpose of the expense
-    #[clap(short, long, value_parser, default_value_t = String::from(""))]
+    #[arg(short, long, default_value_t = String::from(""))]
     description: String,
 
     /// The time the transaction happened. Example format: "2022-05-01 12:21". Default is now.
-    #[clap(short='T', long, parse(try_from_str = parse_time_minutes))]
+    #[arg(short='T', long, value_parser = parse_time_minutes)]
     time: Option<DateTime<Utc>>
 }
 
