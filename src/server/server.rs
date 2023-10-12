@@ -1,7 +1,7 @@
 mod server_config;
 use server_config::AppConfig;
 
-use serde_json;
+use rocket::serde::json::Json;
 
 #[macro_use] extern crate rocket;
 
@@ -13,13 +13,13 @@ fn index() -> &'static str {
 }
 
 #[get("/ledgers")]
-async fn list_ledgers() -> String {
+async fn list_ledgers() -> Json<Vec<String>> {
     let config = AppConfig::read(SERVER_CONFIG)
         .await
         .expect("failed to read app configuration");
 
-    let ledger_ids: Vec<_> = config.ledgers.keys().collect();
-    return serde_json::json!(ledger_ids).to_string();
+    let ledger_ids: Vec<_> = config.ledgers.keys().map(|k| k.to_owned()).collect();
+    return Json(ledger_ids);
 }
 
 // #[get("/ledger/<name>")]
