@@ -9,8 +9,8 @@ pub struct JsonStore {
 }
 
 impl JsonStore {
-    pub fn new(path: &Path) -> JsonStore {
-        return JsonStore { file_path: path.to_owned() };
+    pub fn new<P: AsRef<Path>>(path: P) -> JsonStore {
+        return JsonStore { file_path: path.as_ref().to_owned() };
     }
 }
 
