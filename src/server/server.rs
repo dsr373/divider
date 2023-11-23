@@ -17,27 +17,24 @@ fn index() -> &'static str {
 }
 
 #[get("/ledgers")]
-async fn list_ledgers() -> Json<Vec<String>> {
+async fn list_ledgers() -> Option<Json<Vec<String>>> {
     let config = AppConfig::read(SERVER_CONFIG)
-        .await
-        .expect("failed to read app configuration");
+        .await.ok()?;
 
     let ledger_ids: Vec<_> = config.ledgers.keys().map(|k| k.to_owned()).collect();
-    return Json(ledger_ids);
+    return Some(Json(ledger_ids));
 }
 
 // TODO: make the return type Result<Json<Ledger>> instead so we can differentiate 404 from 500
 #[get("/ledger/<name>")]
 async fn list_one_ledger(name: &str) -> Option<Json<Ledger>> {
     let config = AppConfig::read(SERVER_CONFIG)
-        .await
-        .expect("failed to read app configuration");
+        .await.ok()?;
 
-    let ledger = config.ledgers.get(name)
+    return config.ledgers.get(name)
         .map(|path| JsonStore::new(path))
         .and_then(|store| store.read().ok())
         .map(|ledger| Json(ledger));
-    return ledger;
 }
 
 #[get("/favicon.ico")]
