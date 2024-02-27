@@ -3,8 +3,9 @@ use server_config::AppConfig;
 
 use divider::{Ledger, backend::{JsonStore, LedgerStore}};
 
+use log::error;
 use rocket::serde::json::Json;
-use rocket::fs::{NamedFile};
+use rocket::fs::NamedFile;
 
 #[macro_use] extern crate rocket;
 
@@ -19,7 +20,7 @@ fn index() -> &'static str {
 #[get("/ledgers")]
 async fn list_ledgers() -> Option<Json<Vec<String>>> {
     let config = AppConfig::read(SERVER_CONFIG)
-        .await.ok()?;
+        .await.map_err(|err| error!("{}", err)).ok()?;
 
     let ledger_ids: Vec<_> = config.ledgers.keys().map(|k| k.to_owned()).collect();
     return Some(Json(ledger_ids));
@@ -33,7 +34,7 @@ async fn list_one_ledger(name: &str) -> Option<Json<Ledger>> {
 
     return config.ledgers.get(name)
         .map(|path| JsonStore::new(path))
-        .and_then(|store| store.read().ok())
+        .and_then(|store| store.read().map_err(|err| error!("{}", err)).ok())
         .map(|ledger| Json(ledger));
 }
 

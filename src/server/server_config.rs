@@ -1,9 +1,21 @@
 use std::{path::{Path, PathBuf}, collections::HashMap};
 
-use anyhow::{self, Context};
 use serde::{Serialize, Deserialize};
 use rocket::tokio::fs;
+use thiserror::Error;
 use toml;
+
+#[derive(Error, Debug)]
+pub enum ServerConfigError {
+    #[error("failed to read config file: {0:?}")]
+    FailedToRead(#[from] std::io::Error),
+
+    #[error("failed to parse config file: {0:?}")]
+    FailedToParse(#[from] toml::de::Error),
+
+    #[error("failed to parse ledgers file: {0:?}")]
+    FailedToParseLedgers(#[from] serde_json::Error),
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StorageConfig {
@@ -13,12 +25,10 @@ pub struct StorageConfig {
 }
 
 impl StorageConfig {
-    pub async fn read(filepath: impl AsRef<Path>) -> anyhow::Result<Self> {
+    pub async fn read(filepath: impl AsRef<Path>) -> Result<Self, ServerConfigError> {
         let file_content = fs::read_to_string(filepath)
-            .await
-            .with_context(|| "failed to read config file")?;
-        let config = toml::from_str(&file_content)
-            .with_context(|| "failed to parse config file")?;
+            .await?;
+        let config = toml::from_str(&file_content)?;
         return Ok(config);
     }
 }
@@ -32,14 +42,12 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub async fn read(filepath: impl AsRef<Path>) -> anyhow::Result<Self> {
+    pub async fn read(filepath: impl AsRef<Path>) -> Result<Self, ServerConfigError> {
         let storage = StorageConfig::read(filepath).await?;
 
         let ledgers_map_content = fs::read_to_string(&storage.ledgers_map)
-            .await
-            .with_context(|| "failed to read ledgers file")?;
-        let ledgers = serde_json::from_str(&ledgers_map_content)
-            .with_context(|| "failed to parse ledgers file")?;
+            .await?;
+        let ledgers = serde_json::from_str(&ledgers_map_content)?;
 
         return Ok(AppConfig{ storage, ledgers });
     }
