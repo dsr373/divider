@@ -11,6 +11,10 @@ use rocket::fs::NamedFile;
 
 // TODO: can we have global config read only once? probably not
 const SERVER_CONFIG: &str = "resources/server.toml";
+async fn read_config() -> Option<AppConfig> {
+    AppConfig::read(SERVER_CONFIG).await
+        .map_err(|err| error!("{}", err)).ok()
+}
 
 #[get("/")]
 fn index() -> &'static str {
@@ -19,8 +23,7 @@ fn index() -> &'static str {
 
 #[get("/ledgers")]
 async fn list_ledgers() -> Option<Json<Vec<String>>> {
-    let config = AppConfig::read(SERVER_CONFIG)
-        .await.map_err(|err| error!("{}", err)).ok()?;
+    let config = read_config().await?;
 
     let ledger_ids: Vec<_> = config.ledgers.keys().map(|k| k.to_owned()).collect();
     return Some(Json(ledger_ids));
@@ -29,8 +32,7 @@ async fn list_ledgers() -> Option<Json<Vec<String>>> {
 // TODO: make the return type Result<Json<Ledger>> instead so we can differentiate 404 from 500
 #[get("/ledger/<name>")]
 async fn list_one_ledger(name: &str) -> Option<Json<Ledger>> {
-    let config = AppConfig::read(SERVER_CONFIG)
-        .await.ok()?;
+    let config = read_config().await?;
 
     return config.ledgers.get(name)
         .map(|path| JsonStore::new(path))
