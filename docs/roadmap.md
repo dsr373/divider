@@ -1,14 +1,10 @@
 # Roadmap
 
 ## Coming soon
- - CLI app with json in local storage
+ - Web server JSON API
 
 ## Long term goals
- - desktop app
- - client/server architecture with CLI app as first client
-    - store each transaction as separate file to avoid race conditions
- - phone app client
- - desktop app client
+ - web UI
  - sharing of ledger with other people
     - would require authentication
     - would require solution for common storage of ledger

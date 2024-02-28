@@ -1,55 +1,57 @@
 mod server_config;
+use anyhow::Error;
 use server_config::AppConfig;
+
+mod error;
+use error::ServerError;
 
 use divider::{Ledger, backend::{JsonStore, LedgerStore}};
 
-use log::error;
-use rocket::serde::json::Json;
-use rocket::fs::NamedFile;
-
-#[macro_use] extern crate rocket;
+use axum::{
+    response::Json,
+    routing::get,
+    extract::Path,
+    Router
+};
 
 // TODO: can we have global config read only once? probably not
 const SERVER_CONFIG: &str = "resources/server.toml";
-async fn read_config() -> Option<AppConfig> {
-    AppConfig::read(SERVER_CONFIG).await
-        .map_err(|err| error!("{}", err)).ok()
-}
 
-#[get("/")]
-fn index() -> &'static str {
+async fn index() -> &'static str {
     "Hello, world!"
 }
 
-#[get("/ledgers")]
-async fn list_ledgers() -> Option<Json<Vec<String>>> {
-    let config = read_config().await?;
+async fn list_ledgers() -> Result<Json<Vec<String>>, ServerError> {
+    let config = AppConfig::read(SERVER_CONFIG).await?;
 
     let ledger_ids: Vec<_> = config.ledgers.keys().map(|k| k.to_owned()).collect();
-    return Some(Json(ledger_ids));
+    return Ok(Json(ledger_ids));
 }
 
-// TODO: make the return type Result<Json<Ledger>> instead so we can differentiate 404 from 500
-#[get("/ledger/<name>")]
-async fn list_one_ledger(name: &str) -> Option<Json<Ledger>> {
-    let config = read_config().await?;
+async fn list_one_ledger(Path(name): Path<String>) -> Result<Json<Ledger>, ServerError> {
+    let config = AppConfig::read(SERVER_CONFIG).await?;
 
-    return config.ledgers.get(name)
-        .map(|path| JsonStore::new(path))
-        .and_then(|store| store.read().map_err(|err| error!("{}", err)).ok())
-        .map(|ledger| Json(ledger));
+    let ledger_path = config.ledgers.get(&name)
+        .ok_or_else(|| ServerError::NotFound(format!("{}", name)))?;
+    let ledger = JsonStore::new(ledger_path).read()?;
+    return Ok(Json(ledger));
 }
 
-#[get("/favicon.ico")]
-async fn favicon() -> Option<NamedFile> {
-    NamedFile::open("static/favicon.png").await.ok()
-}
+// #[get("/favicon.ico")]
+// async fn favicon() -> Option<NamedFile> {
+//     NamedFile::open("static/favicon.png").await.ok()
+// }
 
-#[rocket::main]
-async fn main() -> Result<(), rocket::Error> {
-    let _rocket = rocket::build()
-        .mount("/", routes![index, list_ledgers, list_one_ledger, favicon])
-        .launch().await?;
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    let app = Router::new()
+        .route("/", get(index))
+        .route("/ledgers", get(list_ledgers))
+        .route("/ledgers/:name", get(list_one_ledger));
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await.unwrap();
+    println!("Listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, app).await.unwrap();
 
     Ok(())
 }

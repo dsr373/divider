@@ -192,7 +192,7 @@ impl AddExpense {
     }
 }
 
-type ActionResult = result::Result<(), Box<dyn error::Error>>;
+type ActionResult = anyhow::Result<()>;
 
 fn execute_action(action: Subcommands, store: &dyn LedgerStore) -> ActionResult {
     match action {

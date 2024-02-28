@@ -1,7 +1,7 @@
 use std::{path::{Path, PathBuf}, collections::HashMap};
 
 use serde::{Serialize, Deserialize};
-use rocket::tokio::fs;
+use tokio::fs;
 use thiserror::Error;
 use toml;
 
