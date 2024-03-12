@@ -30,4 +30,4 @@ log = "0.4"
 axum = "0.7"
 tokio = { version = "1.36.0", features = ["full"] }
 tower = { version = "0.4.13", features = ["full"] }
-tower-http = "0.5.2"
+tower-http = { version = "0.5.2", features = ["fs"] }

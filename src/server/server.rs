@@ -13,6 +13,7 @@ use axum::{
     extract::Path,
     Router
 };
+use tower_http::services::ServeFile;
 
 // TODO: can we have global config read only once? probably not
 const SERVER_CONFIG: &str = "resources/server.toml";
@@ -32,22 +33,18 @@ async fn list_one_ledger(Path(name): Path<String>) -> Result<Json<Ledger>, Serve
     let config = AppConfig::read(SERVER_CONFIG).await?;
 
     let ledger_path = config.ledgers.get(&name)
-        .ok_or_else(|| ServerError::NotFound(format!("{}", name)))?;
+        .ok_or_else(|| ServerError::NotFound(format!("ledger `{}`", name)))?;
     let ledger = JsonStore::new(ledger_path).read()?;
     return Ok(Json(ledger));
 }
-
-// #[get("/favicon.ico")]
-// async fn favicon() -> Option<NamedFile> {
-//     NamedFile::open("static/favicon.png").await.ok()
-// }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let app = Router::new()
         .route("/", get(index))
         .route("/ledgers", get(list_ledgers))
-        .route("/ledgers/:name", get(list_one_ledger));
+        .route("/ledgers/:name", get(list_one_ledger))
+        .route_service("/favicon.ico", ServeFile::new("static/favicon.png"));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await.unwrap();
     println!("Listening on {}", listener.local_addr().unwrap());
