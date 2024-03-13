@@ -1,6 +1,6 @@
 use axum::{
     http::StatusCode,
-    response::{IntoResponse, Response, Html}
+    response::{IntoResponse, Response}
 };
 use anyhow;
 
