@@ -105,16 +105,10 @@ pub type TransactionResult<T> = Result<T, TransactionError>;
 
 impl Transaction {
     pub fn new(contributions: AmountPerUser<&str>, benefits: BenefitPerUser<&str>,
-        description: &str, direct: bool, opt_id: Option<usize>, opt_time: Option<DateTime<Utc>>) -> Transaction
+        description: &str, direct: bool, opt_id: Option<usize>, time: Option<DateTime<Utc>>) -> Transaction
     {
-        let datetime = match opt_time {
-            None => Utc::now(),
-            Some(time) => time
-        };
-        let id = match opt_id {
-            None => 0,
-            Some(number) => number
-        };
+        let datetime = time.unwrap_or_else(|| Utc::now());
+        let id = opt_id.unwrap_or(0);
         Transaction {
             id,
             datetime,
